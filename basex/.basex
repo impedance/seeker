@@ -1,0 +1,42 @@
+# General Options
+DEBUG = false
+DBPATH = /home/spec/work/seeker/basex/data
+LOGPATH = .logs
+REPOPATH = /home/spec/work/seeker/basex/repo
+LANG = English
+FAIRLOCK = false
+CACHETIMEOUT = 3600
+WRITESTORE = true
+
+# Client/Server Architecture
+HOST = localhost
+PORT = 1984
+SERVERPORT = 1984
+USER = 
+PASSWORD = 
+SERVERHOST = 
+PROXYHOST = 
+PROXYPORT = 0
+NONPROXYHOSTS = 
+IGNORECERT = false
+TIMEOUT = 30
+KEEPALIVE = 600
+PARALLEL = 8
+LOG = data
+LOGEXCLUDE = 
+LOGCUT = 
+LOGMSGMAXLEN = 1000
+LOGTRACE = true
+
+# HTTP Services
+WEBPATH = /home/spec/work/seeker/basex/webapp
+GZIP = false
+RESTPATH = 
+RESTXQPATH = 
+PARSERESTXQ = 3
+RESTXQERRORS = true
+HTTPLOCAL = false
+STOPPORT = 8081
+AUTHMETHOD = Basic
+
+# Local Options
