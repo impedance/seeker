@@ -130,6 +130,15 @@ DROP DB gesn
 - Support searching by code, name, or resource type
 - Consider memory constraints when loading large XML into DOM
 
+## Claude Permissions
+
+**Command Execution**: Claude is authorized to execute all bash, npm, git, and system commands within this project **except**:
+- Destructive operations (removing/deleting important files, database drops, force pushes)
+- Security-critical operations (password changes, credential modifications)
+- Commands that could harm the system or project
+
+**Implications**: Claude will execute commands without requesting permission for normal development tasks (running servers, installing dependencies, testing, building, file operations, etc.).
+
 ## Task Management
 
 **IMPORTANT**: This project uses a task-based development approach with detailed task tracking.
