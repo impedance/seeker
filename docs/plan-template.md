@@ -11,31 +11,32 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 
 ---
 
-## Current Plan (tasks t9-t12: API + parsing layer)
+## Current Plan (Phase 4: navigation + UI wiring)
 
 ### Scope + non-goals
-- **Scope:** implement the BaseX API layer that runs XQuery against the configured REST endpoint, parses the XML output into Section/Work models, exposes wrappers for sections/children/work details/search, and adds a TTL cache plus unified error handling so repeated queries stay fast.
-- **Non-goals:** connecting the API data to navigation/UI modules, hooking search results into the tree, or building favorites/export flows (those remain in t13+).
+- **Scope:** implement the navigation state layer (`currentDatabase`, `expanded`, `selectedWork`, breadcrumbs), routing events, section loading/expansion logic, and the corresponding UI renders (database list, collapsible tree, work details, breadcrumbs, and loaders/errors) so Phase 4 (t13-t20) becomes executable end-to-end.
+- **Non-goals:** wiring the search UI/XQuery layer, cross-database price lookups, or favorites/history features (those remain in t21+ and beyond).
 
 ### Affected entry points/files
-- `app/js/api.js` (core fetch helper, parsing utilities, wrappers, caching/unsafe handling).
-- `app/js/config.js` (if needed to expose timeouts or cache defaults used by the API).
-- `docs/TASKS.md` (mark t9-t12 as complete once implementation is validated).
-- `docs/status.md` (refresh focus/entry anchors to reflect that navigation/state work is now next).
-- `docs/plan-template.md` (this plan record, now describing the API phase of work).
+- `app/js/navigation.js` (state container, loaders, expansion caching, selection hooks, breadcrumb helpers).
+- `app/js/ui.js` (database list, tree/detail rendering, breadcrumb builder, loader/error helpers).
+- `app/js/main.js` (glue that binds navigation updates to UI components and user events).
+- `app/index.html` + `app/css/style.css` (breadcrumb placeholders/styling so the detail panel accommodates the new controls).
+- `docs/TASKS.md` (mark t13-t20 as complete).
+- `docs/status.md` (report Phase 4 completion and move focus toward search/cross-db work).
 
 ### Relevant AICODE anchors to read/update
-- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` to call out that navigation state/tree work (t13-t20) is the current focus after the API layer.
-- Keep all existing ASCII-only `AICODE-*` anchors intact (`AGENTS.md`, `README.md`, `docs/context.md`, etc.).
-- No new anchors beyond the adjusted status lines are required for this chunk.
+- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` in `docs/status.md` to highlight that search (t21-t23) and the cross-db helpers (t24-t27) are next.
+- Keep every ASCII-only anchor in `AGENTS.md`, `README.md`, `docs/context.md`, and others discoverable via `rg -n "AICODE-"`.
+- No new anchors beyond the status lines should be introduced for this change.
 
 ### Risks/contracts to preserve
-- Keep the navigation/status/context anchors discoverable via `rg -n "AICODE-"` after edits.
-- Do not break the BaseX configuration constants in `app/js/config.js` (e.g., `baseURL`, `requestTimeout`, `pageSize`), as other modules rely on them.
-- Ensure fetch timeout handling does not swallow genuine errors and that parsing gracefully reports invalid XML.
+- Preserve the docs invariant (`docs/context.md` anchor) that `README.md`, `docs/context.md`, `docs/status.md`, and `docs/decisions/*` stay present.
+- Keep the `CONFIG` constants untouched so other modules relying on `baseURL`, timeouts, and pagination keep working.
+- Ensure navigation loading/expansion errors propagate cleanly instead of leaving stale UI state.
 
 ### Test/check list
-- Run `rg -n "AICODE-" README.md docs/*.md` after touching docs to confirm the anchors remain visible.
-- Manual review of `app/js/api.js` to ensure `executeQuery`, parsing utilities, and search wrapper output stable models (no automated runtime tests available).
-- Verify `docs/TASKS.md` marks t9-t12 complete and that planners/readers can see the next open tasks.
-- Note that `npm run lint:aicode` / repo tests cannot run because no npm scripts/package are defined, so mention that limitation during the final report.
+- After editing docs, run `rg -n "AICODE-" README.md docs/*.md`.
+- Manually reason through the database list/tree/details flow to ensure handlers/UX match the Phase 4 checklist (no automated runtime tests are set up).
+- Confirm `docs/TASKS.md` now marks t13-t20 complete and `docs/status.md` outlines the next focus.
+- Note the absence of `package.json`, so `npm run lint:aicode` or similar repo tests cannot run; document this limitation in the final summary.
