@@ -20,7 +20,7 @@
 - `rg -n "AICODE-"` · discover anchors required by the navigation system and AGENTS instructions.
 - `./basex/bin/basex -c "CREATE DB gesn ../ГЭСН.xml"` · import XML into BaseX (repeat per file in `TASKS.md`).
 - `./basex/bin/basexhttp` · start the BaseX HTTP server to serve REST queries to the app.
-- `python3 -m venv .venv && .venv/bin/python -m pip install pytest` · conform to the prescribed Python tooling setup.
+- `./scripts/start-dev.sh` · convenience script that launches BaseX HTTP and the `simple_proxy.py` CORS proxy in one go (logs land in `/tmp/basex-http.log`).
 
 ## Search cookbook
 - `rg -n "AICODE-NOTE:" -g"*.md"` · find navigation anchors across docs.
