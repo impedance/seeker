@@ -11,24 +11,31 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 
 ---
 
-## Current Plan (repo navigation initialization)
+## Current Plan (tasks t9-t12: API + parsing layer)
 
 ### Scope + non-goals
-- **Scope:** create README navigation index, add the required documentation files (`docs/context.md`, `docs/status.md`, `docs/decisions/0001-initial.md`), and capture this plan inside `docs/plan-template.md` per AGENTS instructions; include AICODE anchors at the top of README/status/context explaining where to find info.
-- **Non-goals:** no application logic, assets, or BaseX setup changes.
+- **Scope:** implement the BaseX API layer that runs XQuery against the configured REST endpoint, parses the XML output into Section/Work models, exposes wrappers for sections/children/work details/search, and adds a TTL cache plus unified error handling so repeated queries stay fast.
+- **Non-goals:** connecting the API data to navigation/UI modules, hooking search results into the tree, or building favorites/export flows (those remain in t13+).
 
 ### Affected entry points/files
-- `README.md` (for repository layout, entry points, common tasks, search cookbook).
-- `docs/plan-template.md` (current plan plus guidance for future plans).
-- `docs/context.md`, `docs/status.md`, `docs/decisions/0001-initial.md` (provide required context/status/ADR content and anchors).
+- `app/js/api.js` (core fetch helper, parsing utilities, wrappers, caching/unsafe handling).
+- `app/js/config.js` (if needed to expose timeouts or cache defaults used by the API).
+- `docs/TASKS.md` (mark t9-t12 as complete once implementation is validated).
+- `docs/status.md` (refresh focus/entry anchors to reflect that navigation/state work is now next).
+- `docs/plan-template.md` (this plan record, now describing the API phase of work).
 
 ### Relevant AICODE anchors to read/update
-- Search `rg -n "AICODE-" README.md docs/*.md` once README and docs exist to confirm anchors.
-- Add `AICODE-NOTE: NAV/README` near README beginning, plus `AICODE-NOTE: STATUS/FOCUS` and `CONTEXT/` anchors inside docs.
+- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` to call out that navigation state/tree work (t13-t20) is the current focus after the API layer.
+- Keep all existing ASCII-only `AICODE-*` anchors intact (`AGENTS.md`, `README.md`, `docs/context.md`, etc.).
+- No new anchors beyond the adjusted status lines are required for this chunk.
 
 ### Risks/contracts to preserve
-- Maintain ASCII-only `AICODE-*` lines; no unauthorized prefixes.
-- Ensure the README index highlights search commands as mandated by navigation system.
+- Keep the navigation/status/context anchors discoverable via `rg -n "AICODE-"` after edits.
+- Do not break the BaseX configuration constants in `app/js/config.js` (e.g., `baseURL`, `requestTimeout`, `pageSize`), as other modules rely on them.
+- Ensure fetch timeout handling does not swallow genuine errors and that parsing gracefully reports invalid XML.
 
 ### Test/check list
-- None (documentation changes only); manual validation consists of verifying README contains the required sections and `rg -n "AICODE-"` finds the new anchors.
+- Run `rg -n "AICODE-" README.md docs/*.md` after touching docs to confirm the anchors remain visible.
+- Manual review of `app/js/api.js` to ensure `executeQuery`, parsing utilities, and search wrapper output stable models (no automated runtime tests available).
+- Verify `docs/TASKS.md` marks t9-t12 complete and that planners/readers can see the next open tasks.
+- Note that `npm run lint:aicode` / repo tests cannot run because no npm scripts/package are defined, so mention that limitation during the final report.
