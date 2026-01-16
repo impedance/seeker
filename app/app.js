@@ -71,10 +71,10 @@ async function query(xquery) {
 
 // ============ Загрузка всего дерева ============
 async function loadTree() {
-    // Загружаем все Section и Work
+    // Загружаем все Work, чтобы дерево было интерактивным по умолчанию
     const xquery = `
-        for $section in //Section
-        return <item type="{$section/@Type}" code="{$section/@Code}" name="{$section/@Name}"/>
+        for $work in //Work
+        return <item type="{$work/ancestor::Section[1]/@Type}" code="{$work/@Code}" name="{$work/@EndName}"/>
     `;
     const result = await query(xquery);
     return Array.from(result.querySelectorAll('item'));

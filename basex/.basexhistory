@@ -1,0 +1,15 @@
+OPEN gesnmr
+XQUERY for $section in //Section return <item type="{$section/@Type}" code="{$section/@Code}" name="{$section/@Name}"/>
+OPEN gesnmr
+XQUERY for $work in //Work[@Code="01-01-001-01"] return $work
+OPEN gesnmr
+XQUERY for $work in //Work[contains(@Code, "01") or contains(@EndName, "замо")] return <item code="{$work/@Code}" name="{$work/@EndName}"/>
+OPEN gesnmr
+for $section in //Section return <item type="{$section/@Type}" code="{$section/@Code}" name="{$section/@Name}"/>
+SHOW USERS
+ALTER USER admin SET PASSWORD "admin"
+ALTER PASSWORD admin "admin"
+OPEN gesnmr
+for $section in //Section return <item/>
+OPEN gesnmr
+XQUERY for $section in //Section return <item/>

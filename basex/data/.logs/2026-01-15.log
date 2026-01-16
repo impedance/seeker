@@ -2,3 +2,56 @@
 17:51:04.742	SERVER	admin	OK	HTTP Server was started (port: 9090).		
 17:51:08.334	[0:0:0:0:0:0:0:1]:59974	admin	REQUEST	[GET] /		
 17:51:09.473	[0:0:0:0:0:0:0:1]:59974	admin	200		1140.72 ms	
+17:57:11.179	[0:0:0:0:0:0:0:1]:40742	admin	REQUEST	[GET] /		
+17:57:11.188	[0:0:0:0:0:0:0:1]:40742	admin	200		8.74 ms	
+17:57:14.276	[0:0:0:0:0:0:0:1]:40748	admin	401	Basic authentication expected.	0.84 ms	
+17:57:16.981	[0:0:0:0:0:0:0:1]:48092	admin	401	Access denied: admin.	1.83 ms	
+17:57:44.838	[0:0:0:0:0:0:0:1]:49766	admin	401	Access denied: admin.	0.54 ms	
+18:00:25.300	[0:0:0:0:0:0:0:1]:50638	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:00:25.304	[0:0:0:0:0:0:0:1]:50638	admin	501	Method not supported: OPTIONS.	3.92 ms	
+18:01:24.043	127.0.0.1:35406	admin	401	Basic authentication expected.	0.39 ms	
+18:01:27.185	127.0.0.1:35406	admin	401	Access denied: .	0.53 ms	
+18:02:02.240	127.0.0.1:47692	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:02:02.240	127.0.0.1:47692	admin	501	Method not supported: OPTIONS.	0.78 ms	
+18:02:16.124	127.0.0.1:35406	admin	REQUEST	[GET] /favicon.ico		
+18:02:16.127	127.0.0.1:35406	admin	404	Service not found.	4.15 ms	
+18:03:19.342	127.0.0.1:42248	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:03:19.342	127.0.0.1:42248	admin	501	Method not supported: OPTIONS.	0.71 ms	
+18:04:51.335	127.0.0.1:46208	admin	401	Access denied: admin.	3.63 ms	
+18:05:04.459	127.0.0.1:47324	admin	401	Access denied: admin.	0.95 ms	
+18:05:14.620	127.0.0.1:54368	admin	401	Access denied: admin.	0.69 ms	
+18:05:16.422	127.0.0.1:51236	admin	401	Access denied: admin.	0.71 ms	
+18:06:52.396	127.0.0.1:33338	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:06:52.396	127.0.0.1:33338	admin	501	Method not supported: OPTIONS.	0.52 ms	
+18:07:39.140	[0:0:0:0:0:0:0:1]:45436	admin	401	Access denied: admin.	0.83 ms	
+18:07:51.796	[0:0:0:0:0:0:0:1]:49062	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:07:51.797	[0:0:0:0:0:0:0:1]:49062	admin	501	Method not supported: OPTIONS.	1.22 ms	
+18:08:16.899	[0:0:0:0:0:0:0:1]:51544	admin	401	Access denied: admin.	0.68 ms	
+18:08:51.532	SERVER	admin	OK	Server was stopped (port: 1984).		
+18:08:51.533	SERVER	admin	OK	HTTP Server was stopped (port: 9090).		
+18:09:03.336	SERVER	admin	OK	Server was started (port: 1984).		
+18:09:03.394	SERVER	admin	OK	HTTP Server was started (port: 9090).		
+18:09:24.552	SERVER	admin	OK	HTTP Server was stopped (port: 9090).		
+18:09:24.553	SERVER	admin	OK	Server was stopped (port: 1984).		
+18:09:26.558	SERVER	admin	OK	Server was started (port: 1984).		
+18:09:26.598	SERVER	admin	OK	HTTP Server was started (port: 9090).		
+18:09:27.628	[0:0:0:0:0:0:0:1]:36198	admin	REQUEST	[POST] /rest/gesnmr		
+18:09:27.658	[0:0:0:0:0:0:0:1]:36198	admin	400	"" (Line 1): Content is not allowed in prolog.	33.78 ms	
+18:09:31.826	[0:0:0:0:0:0:0:1]:36208	admin	REQUEST	[POST] /rest/gesnmr		
+18:09:31.830	[0:0:0:0:0:0:0:1]:36208	admin	400	"" (Line 1): Content is not allowed in prolog.	4.96 ms	
+18:09:51.150	[0:0:0:0:0:0:0:1]:45054	admin	REQUEST	[POST] /rest?wrap=yes		
+18:09:51.154	[0:0:0:0:0:0:0:1]:45054	admin	400	"" (Line 1): Content is not allowed in prolog.	4.94 ms	
+18:09:56.613	[0:0:0:0:0:0:0:1]:46150	admin	REQUEST	[POST] /rest		
+18:09:56.617	[0:0:0:0:0:0:0:1]:46150	admin	400	"" (Line 1): Content is not allowed in prolog.	4.88 ms	
+18:10:01.539	[0:0:0:0:0:0:0:1]:46158	admin	REQUEST	[GET] /rest		
+18:10:01.578	[0:0:0:0:0:0:0:1]:46158	admin	200		40.13 ms	
+18:10:10.107	[0:0:0:0:0:0:0:1]:55558	admin	REQUEST	[POST] /rest?query=for%20$i%20in%20//Section%20return%20%3Citem/%3E		
+18:10:10.111	[0:0:0:0:0:0:0:1]:55558	admin	400	"" (Line 1): Premature end of file.	4.61 ms	
+18:10:15.300	[0:0:0:0:0:0:0:1]:55564	admin	REQUEST	[POST] /rest		
+18:10:15.697	[0:0:0:0:0:0:0:1]:55564	admin	500	Stopped at /home/spec/work/seeker/basex/webapp, 1/12: [XPDY0002] .: Context value is undefined.	397.85 ms	
+18:10:20.116	[0:0:0:0:0:0:0:1]:45252	admin	REQUEST	[POST] /rest/gesnmr		
+18:10:20.169	[0:0:0:0:0:0:0:1]:45252	admin	200		54.04 ms	
+18:11:56.299	[0:0:0:0:0:0:0:1]:47722	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+18:11:56.300	[0:0:0:0:0:0:0:1]:47722	admin	501	Method not supported: OPTIONS.	1.48 ms	
+21:22:41.880	[0:0:0:0:0:0:0:1]:57344	admin	REQUEST	[OPTIONS] /rest/gesnmr		
+21:22:41.881	[0:0:0:0:0:0:0:1]:57344	admin	501	Method not supported: OPTIONS.	2.05 ms	
