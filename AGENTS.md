@@ -67,5 +67,5 @@ For details, follow `aicode-anchors.md`.
 - `docs/status.md` updated if focus/plan changed
 - Checks run: `npm run lint:aicode` + repo tests (or closest equivalent)
 
-<!-- AICODE-NOTE: NAV/AGENT_RESPONSE when the user requests it, respond in Russian -->
-- When the user explicitly asks, reply in Russian; otherwise stay in the language of the request.
+<!-- AICODE-NOTE: NAV/AGENT_RESPONSE respond in Russian -->
+- reply in Russian always
