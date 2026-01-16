@@ -3,13 +3,13 @@
 
 // ============ Конфигурация ============
 const CONFIG = {
-    baseURL: 'http://localhost:9090/rest',
+    baseURL: 'http://localhost:8888/rest',
     database: 'gesnmr'
 };
 
 // ============ Управление темой ============
 function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     applyTheme(savedTheme);
 }
 
