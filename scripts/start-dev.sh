@@ -4,11 +4,15 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASEX_CMD="$REPO_ROOT/basex/bin/basexhttp"
 PROXY_CMD="$REPO_ROOT/simple_proxy.py"
+UI_DIR="$REPO_ROOT/app"
 DB_NAME="${BASEX_DB:-gesnmr}"
 ALLOW_MULTI="${ALLOW_MULTI:-0}"
 STOP_OLD="${STOP_OLD:-1}"
 BASEX_USER="${BASEX_USER:-admin}"
 BASEX_PASSWORD="${BASEX_PASSWORD:-admin}"
+UI_HOST="${UI_HOST:-127.0.0.1}"
+UI_PORT="${UI_PORT:-5173}"
+UI_LOG="${UI_LOG:-/tmp/ui-http.log}"
 
 if [[ ! -x "$BASEX_CMD" ]]; then
   echo "ERROR: BaseX HTTP launcher not found or not executable at $BASEX_CMD"
@@ -25,8 +29,9 @@ report_running() {
   pgrep -af basexhttp || true
   pgrep -af 'org\.basex\.BaseXHTTP' || true
   pgrep -af simple_proxy.py || true
+  pgrep -af 'http\.server' || true
   echo "Порты с LISTEN:"
-  ss -ltnp 2>/dev/null | grep -E '(:80(80|81)|:88(8[0-9])|:89(8[0-9])|:909[0-9])' || true
+  ss -ltnp 2>/dev/null | grep -E '(:80(80|81)|:88(8[0-9])|:89(8[0-9])|:909[0-9]|:517[3-5])' || true
 }
 
 stop_existing() {
@@ -46,6 +51,14 @@ stop_existing() {
     pgrep -f "$PROXY_CMD" | xargs -r kill
     killed=1
   fi
+  while read -r pid; do
+    args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    if grep -q "http\.server" <<<"$args" && grep -q "$UI_DIR" <<<"$args"; then
+      echo "Останавливаю старый UI server (PID $pid)..."
+      kill "$pid" >/dev/null 2>&1 || true
+      killed=1
+    fi
+  done < <(pgrep -f "http\.server" || true)
   if [[ "$killed" -eq 1 ]]; then
     sleep 1
   fi
@@ -97,6 +110,10 @@ cleanup() {
     echo "Stopping BaseX (PID $basex_pid)..."
     kill "$basex_pid" >/dev/null 2>&1 || true
   fi
+  if [[ -n "${ui_pid-}" ]]; then
+    echo "Stopping UI server (PID $ui_pid)..."
+    kill "$ui_pid" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -121,6 +138,8 @@ BASEX_HTTP_PORT="$(choose_port "${BASEX_PORT-8080}" 8984 9090)"
 BASEX_STOP_PORT="$(choose_port $((BASEX_HTTP_PORT + 1)) $((BASEX_HTTP_PORT + 100)) 9091)"
 DEFAULT_PROXY_PORT=8888
 PROXY_PORT="$(choose_port "${PROXY_PORT-$DEFAULT_PROXY_PORT}" 8889 8890)"
+DEFAULT_UI_PORT="$UI_PORT"
+UI_PORT="$(choose_port "$DEFAULT_UI_PORT" 5174 5175)"
 
 echo "Запускаю BaseX HTTP на :$BASEX_HTTP_PORT (stop-port :$BASEX_STOP_PORT)..."
 "$BASEX_CMD" -h "$BASEX_HTTP_PORT" -s "$BASEX_STOP_PORT" >/tmp/basex-http.log 2>&1 &
@@ -136,6 +155,26 @@ echo "BaseX готов (PID=$basex_pid). Logs: /tmp/basex-http.log"
 if [[ "$PROXY_PORT" -ne "$DEFAULT_PROXY_PORT" ]]; then
   echo "NOTICE: Порт $DEFAULT_PROXY_PORT занят, прокси поднят на :$PROXY_PORT. При необходимости обновите CONFIG.baseURL/baseURLFallbacks в app/js/config.js."
 fi
+
+if [[ "$UI_PORT" -ne "$DEFAULT_UI_PORT" ]]; then
+  echo "NOTICE: Порт $DEFAULT_UI_PORT занят, UI поднят на :$UI_PORT."
+fi
+
+if [[ ! -d "$UI_DIR" ]]; then
+  echo "ERROR: UI directory not found at $UI_DIR"
+  exit 1
+fi
+
+echo "Запускаю UI server на ${UI_HOST}:$UI_PORT (директория $UI_DIR)..."
+python3 -m http.server --bind "$UI_HOST" "$UI_PORT" --directory "$UI_DIR" >"$UI_LOG" 2>&1 &
+ui_pid=$!
+
+if ! wait_for_port "$UI_PORT"; then
+  echo "ERROR: UI server не открыл порт $UI_PORT. См. $UI_LOG"
+  exit 1
+fi
+
+echo "UI готов: http://${UI_HOST}:${UI_PORT}/"
 
 echo "Запускаю CORS proxy на :$PROXY_PORT (проксирует на BaseX :$BASEX_HTTP_PORT)..."
 BASEX_HOST=127.0.0.1 BASEX_PORT="$BASEX_HTTP_PORT" PROXY_PORT="$PROXY_PORT" BASEX_USER="$BASEX_USER" BASEX_PASSWORD="$BASEX_PASSWORD" BASEX_AUTH="${BASEX_AUTH-}" python3 "$PROXY_CMD"

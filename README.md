@@ -20,7 +20,7 @@
 - `rg -n "AICODE-"` · discover anchors required by the navigation system and AGENTS instructions.
 - `./basex/bin/basex -c "CREATE DB gesn ../ГЭСН.xml"` · import XML into BaseX (repeat per file in `TASKS.md`).
 - `./basex/bin/basexhttp` · start the BaseX HTTP server to serve REST queries to the app.
-- `./scripts/start-dev.sh` · convenience script that launches BaseX HTTP and the `simple_proxy.py` CORS proxy in one go (logs land in `/tmp/basex-http.log`).
+- `./scripts/start-dev.sh` · convenience script that launches BaseX HTTP, the `simple_proxy.py` CORS proxy, and a static UI server for `app/` (UI default `http://127.0.0.1:5173/`, logs in `/tmp/basex-http.log` and `/tmp/ui-http.log`).
 
 ## Search cookbook
 - `rg -n "AICODE-NOTE:" -g"*.md"` · find navigation anchors across docs.
@@ -31,5 +31,5 @@
 ## Notes
 - Use `docs/status.md` as the living status, update when focus shifts.
 - Place new architecture rationale in `docs/decisions/*.md` and link via `AICODE-LINK:` from the affected code.
-- `scripts/start-dev.sh` поднимает BaseX+прокси на ближайших свободных портах (8888/8889/8890 для прокси); если порт отличается от 8888, поправьте `CONFIG.baseURL/baseURLFallbacks` в `app/js/config.js`.
+- `scripts/start-dev.sh` поднимает BaseX+прокси+UI на ближайших свободных портах (8888/8889/8890 для прокси, 5173/5174/5175 для UI); если порт прокси отличается от 8888, поправьте `CONFIG.baseURL/baseURLFallbacks` в `app/js/config.js`.
 - Если BaseX требует Basic Auth, скрипт по умолчанию подставляет `BASEX_USER=admin` и `BASEX_PASSWORD=admin`; можно переопределить их (или передать готовое `BASEX_AUTH="Basic dXNlcjpwYXNz"`).
