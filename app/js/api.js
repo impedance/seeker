@@ -45,11 +45,57 @@ function requireDatabase(database) {
   return db;
 }
 
-function buildQueryUrl(database, xquery) {
-  if (!CONFIG.baseURL) {
+let cachedBaseURL = null;
+
+function normalizeCandidate(baseURL) {
+  if (!baseURL) {
+    return '';
+  }
+  return String(baseURL).trim().replace(/\/+$/, '');
+}
+
+function getBaseURLCandidates() {
+  const seen = new Set();
+  const candidates = [];
+  const add = (url) => {
+    const normalized = normalizeCandidate(url);
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    candidates.push(normalized);
+  };
+
+  if (cachedBaseURL) {
+    add(cachedBaseURL);
+  }
+  add(CONFIG.baseURL);
+  if (Array.isArray(CONFIG.baseURLFallbacks)) {
+    CONFIG.baseURLFallbacks.forEach(add);
+  }
+  return candidates;
+}
+
+function setActiveBaseURL(baseURL) {
+  const normalized = normalizeCandidate(baseURL);
+  if (normalized) {
+    cachedBaseURL = normalized;
+  }
+}
+
+function isNetworkError(error) {
+  if (error instanceof TypeError) {
+    return true;
+  }
+  const message = error?.message || '';
+  return typeof message === 'string' && /failed to fetch/i.test(message);
+}
+
+function buildQueryUrl(baseURL, database, xquery) {
+  const normalizedBase = normalizeCandidate(baseURL);
+  if (!normalizedBase) {
     throw new APIError('Base URL is not configured', { code: 'MISSING_BASE_URL' });
   }
-  const normalizedBase = CONFIG.baseURL.replace(/\/+$/, '');
   const url = new URL(`${normalizedBase}/${encodeURIComponent(database)}`);
   url.searchParams.set('query', xquery);
   return url.toString();
@@ -73,44 +119,62 @@ export async function executeQuery(database, xquery, options = {}) {
     }
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getRequestTimeout());
-
-  try {
-    const url = buildQueryUrl(database, xquery);
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/xml',
-        'X-Requested-With': 'Basex-Viewer'
-      },
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new APIError('BaseX query failed', {
-        status: response.status,
-        data: body
-      });
-    }
-
-    const payload = await response.text();
-    if (options.cache !== false) {
-      setCachedResponse(cacheKey, payload);
-    }
-    return payload;
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      throw new APIError('BaseX request timed out', { code: 'TIMEOUT', cause: error });
-    }
-    if (error instanceof APIError) {
-      throw error;
-    }
-    throw new APIError('Failed to execute BaseX query', { cause: error });
-  } finally {
-    clearTimeout(timeout);
+  const baseCandidates = getBaseURLCandidates();
+  if (!baseCandidates.length) {
+    throw new APIError('Base URL is not configured', { code: 'MISSING_BASE_URL' });
   }
+
+  let lastNetworkError = null;
+  for (const baseURL of baseCandidates) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), getRequestTimeout());
+    try {
+      const url = buildQueryUrl(baseURL, database, xquery);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/xml'
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new APIError('BaseX query failed', {
+          status: response.status,
+          data: body
+        });
+      }
+
+      const payload = await response.text();
+      if (options.cache !== false) {
+        setCachedResponse(cacheKey, payload);
+      }
+      setActiveBaseURL(baseURL);
+      return payload;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new APIError('BaseX request timed out', { code: 'TIMEOUT', cause: error });
+      }
+      if (isNetworkError(error)) {
+        lastNetworkError = error;
+        continue;
+      }
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('Failed to execute BaseX query', { cause: error });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new APIError(
+    `Не удалось соединиться с BaseX. Проверьте доступность одного из адресов: ${baseCandidates.join(
+      ', '
+    )}`,
+    { code: 'ALL_BASE_URLS_UNREACHABLE', cause: lastNetworkError }
+  );
 }
 
 function safeParse(xml) {

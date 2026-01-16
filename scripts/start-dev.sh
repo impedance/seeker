@@ -7,6 +7,8 @@ PROXY_CMD="$REPO_ROOT/simple_proxy.py"
 DB_NAME="${BASEX_DB:-gesnmr}"
 ALLOW_MULTI="${ALLOW_MULTI:-0}"
 STOP_OLD="${STOP_OLD:-1}"
+BASEX_USER="${BASEX_USER:-admin}"
+BASEX_PASSWORD="${BASEX_PASSWORD:-admin}"
 
 if [[ ! -x "$BASEX_CMD" ]]; then
   echo "ERROR: BaseX HTTP launcher not found or not executable at $BASEX_CMD"
@@ -101,6 +103,8 @@ trap cleanup EXIT INT TERM
 echo "Проверяю наличие БД '$DB_NAME'..."
 ensure_db_exists
 
+echo "Если BaseX требует Basic Auth, передайте BASEX_USER/BASEX_PASSWORD (или BASEX_AUTH) перед запуском."
+
 report_running
 if [[ "$ALLOW_MULTI" != "1" ]]; then
   if pgrep -f basexhttp >/dev/null || pgrep -f 'org\.basex\.BaseXHTTP' >/dev/null || pgrep -f simple_proxy.py >/dev/null; then
@@ -130,8 +134,8 @@ fi
 echo "BaseX готов (PID=$basex_pid). Logs: /tmp/basex-http.log"
 
 if [[ "$PROXY_PORT" -ne "$DEFAULT_PROXY_PORT" ]]; then
-  echo "NOTICE: Порт $DEFAULT_PROXY_PORT занят, прокси поднят на :$PROXY_PORT. Обновите CONFIG.baseURL в app/app.js при необходимости."
+  echo "NOTICE: Порт $DEFAULT_PROXY_PORT занят, прокси поднят на :$PROXY_PORT. При необходимости обновите CONFIG.baseURL/baseURLFallbacks в app/js/config.js."
 fi
 
 echo "Запускаю CORS proxy на :$PROXY_PORT (проксирует на BaseX :$BASEX_HTTP_PORT)..."
-BASEX_HOST=127.0.0.1 BASEX_PORT="$BASEX_HTTP_PORT" PROXY_PORT="$PROXY_PORT" python3 "$PROXY_CMD"
+BASEX_HOST=127.0.0.1 BASEX_PORT="$BASEX_HTTP_PORT" PROXY_PORT="$PROXY_PORT" BASEX_USER="$BASEX_USER" BASEX_PASSWORD="$BASEX_PASSWORD" BASEX_AUTH="${BASEX_AUTH-}" python3 "$PROXY_CMD"

@@ -1,10 +1,21 @@
 export const CONFIG = {
-  baseURL: 'http://localhost:8080/rest',
+  baseURL: 'http://localhost:8888/rest',
+  baseURLFallbacks: [
+    'http://127.0.0.1:8888/rest',
+    'http://127.0.0.1:8889/rest',
+    'http://127.0.0.1:8890/rest',
+    'http://localhost:8889/rest',
+    'http://localhost:8890/rest',
+    'http://127.0.0.1:8984/rest',
+    'http://localhost:8080/rest',
+    'http://localhost:8984/rest',
+    'http://localhost:9090/rest'
+  ],
   requestTimeout: 30000,
   cacheTTL: 120000,
   pageSize: 100,
   searchDebounce: 300,
-  defaultDatabase: 'gesn',
+  defaultDatabase: 'gesnmr',
   databases: [
     {
       id: 'gesn',

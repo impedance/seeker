@@ -31,3 +31,5 @@
 ## Notes
 - Use `docs/status.md` as the living status, update when focus shifts.
 - Place new architecture rationale in `docs/decisions/*.md` and link via `AICODE-LINK:` from the affected code.
+- `scripts/start-dev.sh` поднимает BaseX+прокси на ближайших свободных портах (8888/8889/8890 для прокси); если порт отличается от 8888, поправьте `CONFIG.baseURL/baseURLFallbacks` в `app/js/config.js`.
+- Если BaseX требует Basic Auth, скрипт по умолчанию подставляет `BASEX_USER=admin` и `BASEX_PASSWORD=admin`; можно переопределить их (или передать готовое `BASEX_AUTH="Basic dXNlcjpwYXNz"`).

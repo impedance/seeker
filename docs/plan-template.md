@@ -11,33 +11,30 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 
 ---
 
-## Current Plan (Phases 5-6: search + cross-db polish)
+## Current Plan (Phase 7: resilience + CDN fixes)
 
 ### Scope + non-goals
-- **Scope:** implement the search workflow (t21-t23) with debounce, grouped results, and tree integration, and add the cross-database pricing/navigation helpers (t24-t27) that enrich resource rows with fsbts data, allow navigation to resource references, and capture back/forward history.
-- **Non-goals:** future extension tasks (filters, export, favorites) remain in Phase 7+; we do not add automated tests beyond manual scenario checks.
+- **Scope:** update the Bootstrap stylesheet anchor to include the correct integrity hash and add BaseX endpoint fallbacks so the UI can reach whichever server port `scripts/start-dev.sh` opened.
+- **Non-goals:** filters/export/favorites (t28-t30) and Phase 8 stability chores remain for a dedicated follow-up.
 
 ### Affected entry points/files
-- `app/js/search.js` (debounced input handler, search orchestration, grouped result payloads).
-- `app/js/api.js` (search query enhancements + resource pricing/reference helpers, catalog lookup utilities).
-- `app/js/navigation.js` (history stacks, resource selection, breadcrumb context, and resource price enrichment).
-- `app/js/ui.js` (search-results rendering, resource table status badges, history buttons, and dual work/resource detail views).
-- `app/js/main.js` (wiring search results + history controls into Navigation/UI events).
-- `app/index.html`, `app/css/style.css` (new history controls, search-results panel, and resource status styles).
-- `docs/TASKS.md` (mark t21-t27 done and capture short completion notes).
-- `docs/status.md` (record search + cross-db accomplishments and update focus/next-up lines).
+- `docs/plan-template.md` (capture the new work plan for follow-up tasks).
+- `app/index.html` (fix the Bootstrap integrity attribute).
+- `app/js/config.js` (declare optional alternative BaseX endpoints).
+- `app/js/api.js` (try each configured endpoint before failing and remember the working host).
+- `simple_proxy.py` (allow GET/HEAD through the CORS proxy so the UI can reuse it).
 
 ### Relevant AICODE anchors to read/update
-- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` in `docs/status.md` to point to the new Phase 7 targets (t28-t30, t31+).
-- Keep every ASCII-only anchor (`AGENTS.md`, `README.md`, `docs/context.md`, etc.) discoverable via `rg -n "AICODE-"`.
-- After touching docs, re-run `rg -n "AICODE-" README.md docs/*.md`.
+- `README.md` as the navigation index that describes the entry point we touched (`AICODE-NOTE: NAV/README entry`).
+- `docs/context.md` / `docs/status.md` so their invariants remain searchable (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT ...`, `AICODE-NOTE: STATUS/...`).
+- Run `rg -n "AICODE-" README.md docs/*.md` after editing docs.
 
 ### Risks/contracts to preserve
-- Maintain `docs/context.md` invariant (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]`).
-- Preserve `CONFIG` values (baseURL, timeouts, pageSize) so API consumers in other modules do not break.
-- Ensure history/navigation interactions do not leave the tree or resource panel in a mismatched state when switching databases/search hits.
+- Keep the existing `AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]`.
+- Avoid changing `CONFIG` semantics (timeouts, caching, database list) beyond the new fallback helpers.
+- Ensure caching logic still works even though we try multiple endpoints (cache key remains `database|query`).
 
 ### Test/check list
-- After editing docs, run `rg -n "AICODE-" README.md docs/*.md`.
-- Manually verify: search input respects debounce, grouped results appear, clicking a hit loads the correct database and expands the tree; resources show price badges and click into fsbts references; history buttons go back/forward between work/resource.
-- Confirm `docs/TASKS.md` marks t21-t27 complete and `docs/status.md` reflects the new focus.
+- `rg -n "AICODE-" README.md docs/*.md` after touching docs.
+- Manual smoke check: load the UI, confirm Bootstrap loads without integrity warnings, select a base, expand a node, and see that at least one BaseX port succeeds instead of showing repeated network errors.
+- Verify the BaseX fallback list covers the ports mentioned in `scripts/start-dev.sh` (8080/8984/9090).
