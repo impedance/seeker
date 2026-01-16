@@ -259,16 +259,30 @@ export function parseSearchResults(xml) {
   const root = doc.documentElement;
   const hits = root.tagName === 'Hit' ? [root] : Array.from(doc.querySelectorAll('Hit'));
 
-  return hits.map((hit) => ({
-    code: hit.getAttribute('Code') || '',
-    name: hit.getAttribute('Name') || '',
-    measureUnit: hit.getAttribute('MeasureUnit') || '',
-    sections: Array.from(hit.querySelectorAll('Section')).map((section) => ({
+  return hits.map((hit) => {
+    const sectionNodes = Array.from(hit.querySelectorAll('Section'));
+    const sections = sectionNodes.map((section) => ({
       code: section.getAttribute('Code') || '',
       name: section.getAttribute('Name') || '',
       type: section.getAttribute('Type') || ''
-    }))
-  }));
+    }));
+    const sectionPath = sections.map((section) => section.code).filter(Boolean);
+    const sectionNames = sections.map((section) => section.name).filter(Boolean);
+
+    return {
+      code: hit.getAttribute('Code') || '',
+      name: hit.getAttribute('Name') || '',
+      measureUnit: hit.getAttribute('MeasureUnit') || '',
+      sections,
+      sectionPath,
+      sectionNames,
+      resources: Array.from(hit.querySelectorAll('Resource')).map((resource) => ({
+        code: resource.getAttribute('Code') || '',
+        name: resource.getAttribute('EndName') || resource.getAttribute('Name') || '',
+        measureUnit: resource.getAttribute('MeasureUnit') || ''
+      }))
+    };
+  });
 }
 
 function escapeXQueryString(value) {
@@ -330,18 +344,147 @@ export async function search(database, term) {
           for $work in //Work
           let $code := string($work/@Code)
           let $title := string($work/@EndName)
+          let $resources := $work/Resources/Resource
+          let $resourceMatches :=
+            exists(
+              for $resource in $resources
+              let $resourceCode := string($resource/@Code)
+              let $resourceName := string($resource/@EndName)
+              let $resourceTitle := string($resource/@Name)
+              where
+                contains(lower-case($resourceCode), lower-case($term)) or
+                contains(lower-case($resourceName), lower-case($term)) or
+                contains(lower-case($resourceTitle), lower-case($term))
+              return $resource
+            )
           let $match :=
             contains(lower-case($code), lower-case($term)) or
             contains(lower-case($title), lower-case($term)) or
-            contains(lower-case(string($work/@Name)), lower-case($term))
+            contains(lower-case(string($work/@Name)), lower-case($term)) or
+            $resourceMatches
           where $match
           return
             <Hit Code="{$code}" Name="{$title}" MeasureUnit="{$work/@MeasureUnit}">
-              { for $sec in $work/ancestor::Section return <Section Code="{$sec/@Code}" Name="{$sec/@Name}" Type="{$sec/@Type}" /> }
+              { for $sec in reverse($work/ancestor::Section) return <Section Code="{$sec/@Code}" Name="{$sec/@Name}" Type="{$sec/@Type}" /> }
+              { for $resource in $resources return <Resource Code="{$resource/@Code}" Name="{$resource/@EndName}" MeasureUnit="{$resource/@MeasureUnit}" /> }
             </Hit>
         ), 1, $limit)
       }</results>`;
 
   const response = await executeQuery(database, query);
   return parseSearchResults(response);
+}
+
+const resourceReferenceCache = new Map();
+
+export function findCatalogEntryForResource(resourceCode) {
+  if (!resourceCode) {
+    return null;
+  }
+  const normalized = String(resourceCode).trim();
+  if (!CONFIG.catalogMap) {
+    return null;
+  }
+  return CONFIG.catalogMap.find((entry) => normalized.startsWith(entry.prefix)) || null;
+}
+
+function parseResourceReference(xml, database) {
+  const doc = safeParse(xml);
+  const node = doc.querySelector('Resource');
+  if (!node) {
+    return null;
+  }
+  const sectionNodes = Array.from(node.querySelectorAll('Section'));
+  const sections = sectionNodes.map((section) => ({
+    code: section.getAttribute('Code') || '',
+    name: section.getAttribute('Name') || '',
+    type: section.getAttribute('Type') || ''
+  }));
+  const sectionPath = sections.map((section) => section.code).filter(Boolean);
+  const sectionNames = sections.map((section) => section.name).filter(Boolean);
+  const priceNode = node.querySelector('Price');
+  const price = priceNode
+    ? {
+        cost: Number(priceNode.getAttribute('Cost')) || null,
+        optCost: Number(priceNode.getAttribute('OptCost')) || null
+      }
+    : null;
+  return {
+    code: node.getAttribute('Code') || '',
+    name: node.getAttribute('Name') || node.getAttribute('EndName') || '',
+    measureUnit: node.getAttribute('MeasureUnit') || '',
+    database,
+    sections,
+    sectionPath,
+    sectionNames,
+    price
+  };
+}
+
+async function fetchResourceReference(database, resourceCode) {
+  const query = `
+    let $code := ${escapeXQueryString(resourceCode)}
+    return
+      <resource>{
+        for $item in //Resource[@Code=$code]
+        return
+          <Resource Code="{$item/@Code}" Name="{$item/@Name}" EndName="{$item/@EndName}" MeasureUnit="{$item/@MeasureUnit}">
+            { for $section in reverse($item/ancestor::Section) return <Section Code="{$section/@Code}" Name="{$section/@Name}" Type="{$section/@Type}" /> }
+            { $item/Prices/Price }
+          </Resource>
+      }</resource>`;
+  const response = await executeQuery(database, query);
+  return parseResourceReference(response, database);
+}
+
+export async function getResourceReference(resourceCode) {
+  const catalogEntry = findCatalogEntryForResource(resourceCode);
+  if (!catalogEntry) {
+    return null;
+  }
+  const cacheKey = `${catalogEntry.database}|${resourceCode}`;
+  if (resourceReferenceCache.has(cacheKey)) {
+    return resourceReferenceCache.get(cacheKey);
+  }
+  try {
+    const reference = await fetchResourceReference(catalogEntry.database, resourceCode);
+    resourceReferenceCache.set(cacheKey, reference);
+    return reference;
+  } catch (error) {
+    resourceReferenceCache.set(cacheKey, null);
+    throw error;
+  }
+}
+
+export async function enrichResourcesWithCatalog(resources = []) {
+  if (!Array.isArray(resources)) {
+    return resources;
+  }
+  const enriched = await Promise.all(
+    resources.map(async (resource) => {
+      if (!resource?.code) {
+        return { ...resource };
+      }
+      try {
+        const reference = await getResourceReference(resource.code);
+        if (!reference) {
+          return { ...resource };
+        }
+        return {
+          ...resource,
+          name: reference.name || resource.name,
+          measureUnit: reference.measureUnit || resource.measureUnit,
+          price: reference.price,
+          catalogDatabase: reference.database,
+          catalogSectionPath: reference.sectionPath,
+          catalogSectionNames: reference.sectionNames,
+          catalog: reference
+        };
+      } catch (error) {
+        console.error('Failed to enrich resource', resource.code, error);
+        return { ...resource };
+      }
+    })
+  );
+  return enriched;
 }

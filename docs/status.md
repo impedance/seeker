@@ -1,21 +1,19 @@
-<!-- AICODE-NOTE: STATUS/FOCUS focus: navigation state + UI wiring (t13-t20) ref: docs/TASKS.md -->
-<!-- AICODE-NOTE: STATUS/ENTRY next: search + cross-db resources (t21-t27) ref: docs/TASKS.md -->
+<!-- AICODE-NOTE: STATUS/FOCUS focus: filters + export (t28-t30) ref: docs/TASKS.md -->
+<!-- AICODE-NOTE: STATUS/ENTRY next: stability + quality (t31-t34) ref: docs/TASKS.md -->
 
 # Status
 
 ## Latest accomplishments
-- Captured the initial plan in `docs/plan-template.md` and confirmed the BaseX import steps listed in `docs/TASKS.md`.
-- Created all required BaseX databases (`gesn`, `gesnm`, `gesnmr`, `gesnp`, `gesnr`, `fsbts_mat`, `fsbts_mash`) from the XML sources.
-- Scaffolded the `app/` layout including `app/index.html` with Bootstrap panels, the starter CSS bundle, and stub JS modules that render placeholders.
-- Attempted `./bin/basexhttp -d -l -h 8080` to expose `http://localhost:8080`, but the sandbox blocks listening sockets (`java.net.SocketException: Operation not permitted`); recorded the limitation for future testing.
-- Finished the initial CSS layout pass (panels, tree, details, responsive) and completed the BaseX `CONFIG` metadata list.
-- Delivered the BaseX API module (fetch with timeout, DOMParser-based parsing, section/work/search wrappers, and TTL caching) so navigation can rely on real data.
+- Описали архитектуру и план, а также внедрили всю базовую структуру и конфиги (Phase 1-4), включая API модуль для BaseX.
+- Добавили модули поиска с debounce 300 мс, кэшированием, расширенным XQuery (учёт ресурсов) и группировкой по базам.
+- Отрисовали панель результатов поиска, результаты показывают путь/ресурсы и клёкабельны: клик раскрывает дерево, разворачивает путь и выбирает работу.
+- Подключили к каталогам `fsbts_mat`/`fsbts_mash` цены ресурсов, подчёркивание строк таблицы и карточку ресурса, клики ведут в справочник без потери дерева.
+- Добавили историю переходов (Back/Forward) между работами и ресурсами и показали соответствующие кнопки в хедере.
 
 ## Current focus
-- Build the navigation state layer (`currentDatabase`, `path`, `expanded`, `selected`) and position it to emit events for UI updates (t13-t16).
-- Start wiring UI pieces (database list, tree placeholder, details/breadcrumbs) to respond to navigation state without yet rendering real data (t16-t20).
+- Завершить этап Phase 7: фильтры дерева, экспорт/избранное и аналогичные расширения из блоков t28-t30 (`docs/TASKS.md`).
 
-## Next up (after navigation docs)
-1. Draft the search module (debounce + grouped results) and connect it to the new `search` wrapper plus tree navigation (t21-t23).
-2. Layer in cross-db resource linking, price lookups, and history/navigation helpers after search works (t24-t27).
-3. Continue tracking `AICODE-*` anchors (`rg -n "AICODE-" README.md docs/*.md`) after every significant edit.
+## Next up
+1. Проверить сценарии из `docs/TASKS.md` для Phase 8, чтобы убедиться, что фильтры/экспорт/избранное задокументированы и готовы к реализации.
+2. Обсудить и закрепить стабильность/обработку ошибок для API/UI (t31-t34) и затем выполнить проверку по списку.
+3. Продолжать мониторить `AICODE-*` анкоры (`rg -n "AICODE-" README.md docs/*.md`) после каждого релевантного правки.

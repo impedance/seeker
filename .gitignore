@@ -1,3 +1,10 @@
 basex/data/.logs
 .env
 __pycache__/
+ГЭСН.xml
+ГЭСНм.xml
+ГЭСНмр.xml
+ГЭСНп.xml
+ГЭСНр.xml
+ФСБЦ_Мат&Оборуд.xml
+ФСБЦ_Маш.xml

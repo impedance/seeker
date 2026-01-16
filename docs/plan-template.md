@@ -11,32 +11,33 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 
 ---
 
-## Current Plan (Phase 4: navigation + UI wiring)
+## Current Plan (Phases 5-6: search + cross-db polish)
 
 ### Scope + non-goals
-- **Scope:** implement the navigation state layer (`currentDatabase`, `expanded`, `selectedWork`, breadcrumbs), routing events, section loading/expansion logic, and the corresponding UI renders (database list, collapsible tree, work details, breadcrumbs, and loaders/errors) so Phase 4 (t13-t20) becomes executable end-to-end.
-- **Non-goals:** wiring the search UI/XQuery layer, cross-database price lookups, or favorites/history features (those remain in t21+ and beyond).
+- **Scope:** implement the search workflow (t21-t23) with debounce, grouped results, and tree integration, and add the cross-database pricing/navigation helpers (t24-t27) that enrich resource rows with fsbts data, allow navigation to resource references, and capture back/forward history.
+- **Non-goals:** future extension tasks (filters, export, favorites) remain in Phase 7+; we do not add automated tests beyond manual scenario checks.
 
 ### Affected entry points/files
-- `app/js/navigation.js` (state container, loaders, expansion caching, selection hooks, breadcrumb helpers).
-- `app/js/ui.js` (database list, tree/detail rendering, breadcrumb builder, loader/error helpers).
-- `app/js/main.js` (glue that binds navigation updates to UI components and user events).
-- `app/index.html` + `app/css/style.css` (breadcrumb placeholders/styling so the detail panel accommodates the new controls).
-- `docs/TASKS.md` (mark t13-t20 as complete).
-- `docs/status.md` (report Phase 4 completion and move focus toward search/cross-db work).
+- `app/js/search.js` (debounced input handler, search orchestration, grouped result payloads).
+- `app/js/api.js` (search query enhancements + resource pricing/reference helpers, catalog lookup utilities).
+- `app/js/navigation.js` (history stacks, resource selection, breadcrumb context, and resource price enrichment).
+- `app/js/ui.js` (search-results rendering, resource table status badges, history buttons, and dual work/resource detail views).
+- `app/js/main.js` (wiring search results + history controls into Navigation/UI events).
+- `app/index.html`, `app/css/style.css` (new history controls, search-results panel, and resource status styles).
+- `docs/TASKS.md` (mark t21-t27 done and capture short completion notes).
+- `docs/status.md` (record search + cross-db accomplishments and update focus/next-up lines).
 
 ### Relevant AICODE anchors to read/update
-- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` in `docs/status.md` to highlight that search (t21-t23) and the cross-db helpers (t24-t27) are next.
-- Keep every ASCII-only anchor in `AGENTS.md`, `README.md`, `docs/context.md`, and others discoverable via `rg -n "AICODE-"`.
-- No new anchors beyond the status lines should be introduced for this change.
+- Update `AICODE-NOTE: STATUS/FOCUS` + `AICODE-NOTE: STATUS/ENTRY` in `docs/status.md` to point to the new Phase 7 targets (t28-t30, t31+).
+- Keep every ASCII-only anchor (`AGENTS.md`, `README.md`, `docs/context.md`, etc.) discoverable via `rg -n "AICODE-"`.
+- After touching docs, re-run `rg -n "AICODE-" README.md docs/*.md`.
 
 ### Risks/contracts to preserve
-- Preserve the docs invariant (`docs/context.md` anchor) that `README.md`, `docs/context.md`, `docs/status.md`, and `docs/decisions/*` stay present.
-- Keep the `CONFIG` constants untouched so other modules relying on `baseURL`, timeouts, and pagination keep working.
-- Ensure navigation loading/expansion errors propagate cleanly instead of leaving stale UI state.
+- Maintain `docs/context.md` invariant (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]`).
+- Preserve `CONFIG` values (baseURL, timeouts, pageSize) so API consumers in other modules do not break.
+- Ensure history/navigation interactions do not leave the tree or resource panel in a mismatched state when switching databases/search hits.
 
 ### Test/check list
 - After editing docs, run `rg -n "AICODE-" README.md docs/*.md`.
-- Manually reason through the database list/tree/details flow to ensure handlers/UX match the Phase 4 checklist (no automated runtime tests are set up).
-- Confirm `docs/TASKS.md` now marks t13-t20 complete and `docs/status.md` outlines the next focus.
-- Note the absence of `package.json`, so `npm run lint:aicode` or similar repo tests cannot run; document this limitation in the final summary.
+- Manually verify: search input respects debounce, grouped results appear, clicking a hit loads the correct database and expands the tree; resources show price badges and click into fsbts references; history buttons go back/forward between work/resource.
+- Confirm `docs/TASKS.md` marks t21-t27 complete and `docs/status.md` reflects the new focus.
