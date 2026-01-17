@@ -98,6 +98,9 @@ function createWorkNode(work, level, handlers, selectedWorkCode) {
   row.dataset.type = 'work';
   row.dataset.code = work.code || '';
   row.dataset.level = level;
+  row.dataset.sectionPath = Array.isArray(work.sectionPath)
+    ? work.sectionPath.filter(Boolean).join(',')
+    : '';
 
   const info = document.createElement('div');
   info.className = 'item-meta';
@@ -127,9 +130,37 @@ function createWorkNode(work, level, handlers, selectedWorkCode) {
     row.classList.add('active');
   }
 
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  const pathLabel = Array.isArray(work.sectionPath)
+    ? work.sectionPath.filter(Boolean).join(' › ')
+    : '';
+  const details = [];
+  if (work.measureUnit) {
+    details.push(work.measureUnit);
+  }
+  if (pathLabel) {
+    details.push(pathLabel);
+  }
+  const displayName = work.name || work.code || '—';
+  const titleParts = [displayName, ...details];
+  const titleText = titleParts.filter(Boolean).join(' — ');
+  if (titleText) {
+    row.title = titleText;
+    row.setAttribute('aria-label', titleText);
+  }
+  const selectWork = () => handlers.onWorkSelect?.(work);
   row.addEventListener('click', (event) => {
     event.stopPropagation();
-    handlers.onWorkSelect?.(work);
+    selectWork();
+  });
+  row.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    selectWork();
   });
   return row;
 }

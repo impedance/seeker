@@ -219,6 +219,20 @@ function buildWorkSummary(node, sectionPath) {
   };
 }
 
+function collectWorkSummaries(node, sectionPath) {
+  const works = [];
+  Array.from(node.children).forEach((child) => {
+    if (child.tagName === 'Work') {
+      works.push(buildWorkSummary(child, sectionPath));
+      return;
+    }
+    if (child.tagName === 'NameGroup') {
+      works.push(...collectWorkSummaries(child, sectionPath));
+    }
+  });
+  return works;
+}
+
 function buildSection(node, depth = 0, parentPath = []) {
   const code = node.getAttribute('Code') || '';
   const sectionPath = code ? [...parentPath, code] : [...parentPath];
@@ -235,10 +249,10 @@ function buildSection(node, depth = 0, parentPath = []) {
   Array.from(node.children).forEach((child) => {
     if (child.tagName === 'Section') {
       section.children.push(buildSection(child, depth + 1, sectionPath));
-    } else if (child.tagName === 'Work') {
-      section.works.push(buildWorkSummary(child, sectionPath));
     }
   });
+
+  section.works = collectWorkSummaries(node, sectionPath);
 
   return section;
 }

@@ -11,30 +11,46 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 
 ---
 
-## Current Plan (Phase 7: resilience + CDN fixes)
+## Current Plan (Tree shows NameGroup Work items properly)
 
 ### Scope + non-goals
-- **Scope:** update the Bootstrap stylesheet anchor to include the correct integrity hash and add BaseX endpoint fallbacks so the UI can reach whichever server port `scripts/start-dev.sh` opened.
-- **Non-goals:** filters/export/favorites (t28-t30) and Phase 8 stability chores remain for a dedicated follow-up.
+- **Scope:** Обеспечить, чтобы `NameGroup` (группировки работ внутри таблиц) раскрывались в дереве, добавляя реальные Work-узлы рядом с Section без изменения существующей навигации/кэширования и сохраняя трассировку путей/истории.
+- **Non-goals:** Фильтры/экспорт/избранное (t28-t30), Phase 8 стабилизация и визуальные редизайны, а также любые асинхронные расширения поискового слоя.
 
 ### Affected entry points/files
-- `docs/plan-template.md` (capture the new work plan for follow-up tasks).
-- `app/index.html` (fix the Bootstrap integrity attribute).
-- `app/js/config.js` (declare optional alternative BaseX endpoints).
-- `app/js/api.js` (try each configured endpoint before failing and remember the working host).
-- `simple_proxy.py` (allow GET/HEAD through the CORS proxy so the UI can reuse it).
+- `app/js/api.js` (парсинг XML: `buildSection`, вспомогательные функции, сборка Summary для Work).
+- `app/js/ui.js` (рендер дерева и метаданные Work-узлов, оставить Section только разворачиваемыми).
+- `app/js/navigation.js` (проверка, чтобы `selectWork`/history/breadcrumbs продолжали работать по Work-кодам).
+- `docs/status.md` (обновить фокус/следующие шаги).
+- `docs/plan-template.md` (этот документ, чтобы зафиксировать план).
 
 ### Relevant AICODE anchors to read/update
-- `README.md` as the navigation index that describes the entry point we touched (`AICODE-NOTE: NAV/README entry`).
-- `docs/context.md` / `docs/status.md` so their invariants remain searchable (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT ...`, `AICODE-NOTE: STATUS/...`).
-- Run `rg -n "AICODE-" README.md docs/*.md` after editing docs.
+- `docs/context.md` (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]` обязательный).
+- `docs/status.md` (`AICODE-NOTE: STATUS/FOCUS`/`STATUS/ENTRY`, если фокус смещается).
+- После всех изменений в документах выполнить `rg -n "AICODE-" README.md docs/*.md`.
 
 ### Risks/contracts to preserve
-- Keep the existing `AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]`.
-- Avoid changing `CONFIG` semantics (timeouts, caching, database list) beyond the new fallback helpers.
-- Ensure caching logic still works even though we try multiple endpoints (cache key remains `database|query`).
+- Не трогать `AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT ... [2025-10-05]`.
+- Не ломать кэш `sectionCache`, `childrenCache`, `workCache`, чтобы повторные выборы продолжали использовать старые данные.
+- Не превращать `Section` в кликабельные работы: клики по Section только разворачивают/сворачивают узел; Work-узлы остаются единственными кликабельными элементами с `handlers.onWorkSelect`.
 
 ### Test/check list
-- `rg -n "AICODE-" README.md docs/*.md` after touching docs.
-- Manual smoke check: load the UI, confirm Bootstrap loads without integrity warnings, select a base, expand a node, and see that at least one BaseX port succeeds instead of showing repeated network errors.
-- Verify the BaseX fallback list covers the ports mentioned in `scripts/start-dev.sh` (8080/8984/9090).
+- Открыть базу (например, `ГЭСН`) и раскрыть таблицу (например, `02-02-002`): проверить, что появились Work-строки из `NameGroup`.
+- Кликнуть Work и убедиться, что карточка деталей с ресурсами/цитатами отобразилась и хлебные крошки обновились.
+- Пройти результат поиска и убедиться, что навигация раскрывает путь и показывает правильную Work.
+- Убедиться, что секции без Work ведут себя как прежде и не дублируются.
+- После редактирования документа и README выполнить `rg -n "AICODE-" README.md docs/*.md`.
+
+### Phase breakdown (tasks)
+- **Phase 1: Data mapping**
+  - Изучить XML: Section → NameGroup → Work, чтобы понять, где живут работы.
+  - Добавить функцию `collectWorkNodes(node, sectionPath)` (или аналог) для рекурсивного обхода NameGroup и прямых Work.
+  - Обновить `buildSection`, чтобы после сбора `section.children` также заполнялся `section.works` без потери `section.path`.
+- **Phase 2: UI behavior**
+  - Убедиться, что `renderTree` добавляет новые Work-узлы (с кодом/name/measurement), сохраняя текущую структуру DOM.
+  - Сохранять `handlers.onWorkSelect` только за Work-узлами и не делать их повторно раскрывающимися.
+  - Проверить, что выбранный Work подсвечивается и не ломается разделение Sections/Works.
+  - Добавить клавиатурный доступ, `aria-label` и `title` к Work-узлам, чтобы они оставались единственными интерактивными элементами в дереве и ясно описывали путь/измерения.
+- **Phase 3: Navigation and caching**
+  - Гарантировать, что `Navigation.selectWork` продолжает кешировать детали по Work-коду (`workCache`), и кэшированные записи содержат разделы из NameGroup.
+  - Проверить, что история/хлебные крошки строятся по `sectionPath`/`sectionNames`, игнорируя NameGroup промежуточно.
