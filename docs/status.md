@@ -1,5 +1,5 @@
-<!-- AICODE-NOTE: STATUS/FOCUS focus: filters + export (t28-t30) ref: docs/TASKS.md -->
-<!-- AICODE-NOTE: STATUS/ENTRY next: stability + quality (t31-t34) ref: docs/TASKS.md -->
+<!-- AICODE-NOTE: STATUS/FOCUS focus: UI performance 80/20 (tree load/render) ref: docs/plan-ui-performance.md -->
+<!-- AICODE-NOTE: STATUS/ENTRY next: return to filters + export (t28-t30) ref: docs/TASKS.md -->
 
 # Status
 
@@ -13,9 +13,9 @@
 - Сделали Work-узлы фокусируемыми, добавили заголовки (`title`/`aria-label`) и поддержку Enter/Space, чтобы клавиатурная навигация по дереву шла по работе и не мешала секциям.
 
 ## Current focus
-- Завершить этап Phase 7: фильтры дерева, экспорт/избранное и аналогичные расширения из блоков t28-t30 (`docs/TASKS.md`).
+- Ускорить UI по плану 80/20: уменьшить payload `getSections`, убрать лишние deep-clone и сделать рендер дерева дешевле (делегирование событий + переиспользование DOM).
 
 ## Next up
-1. Проверить сценарии из `docs/TASKS.md` для Phase 8, чтобы убедиться, что фильтры/экспорт/избранное задокументированы и готовы к реализации.
-2. Обсудить и закрепить стабильность/обработку ошибок для API/UI (t31-t34) и затем выполнить проверку по списку.
+1. Вернуться к Phase 7: фильтры дерева, экспорт/избранное и аналогичные расширения из блоков t28-t30 (`docs/TASKS.md`).
+2. Пройтись по Phase 8 (t31-t34): устойчивость/обработка ошибок API/UI и проверки.
 3. Продолжать мониторить `AICODE-*` анкоры (`rg -n "AICODE-" README.md docs/*.md`) после каждого релевантного правки.

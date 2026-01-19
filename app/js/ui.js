@@ -92,49 +92,146 @@ function buildResourceTable(resources = [], handlers = {}) {
   return container;
 }
 
-function createWorkNode(work, level, handlers, selectedWorkCode) {
-  const row = document.createElement('div');
-  row.className = 'tree-item work-node';
-  row.dataset.type = 'work';
-  row.dataset.code = work.code || '';
+const treeRuntime = {
+  container: null,
+  sectionsRef: null,
+  handlers: {},
+  delegationAttached: false,
+  sectionNodes: new Map(),
+  workNodes: new Map(),
+  workSummaries: new Map(),
+  activeWorkCode: null
+};
+
+function setActiveWork(workCode) {
+  const nextCode = workCode || null;
+  if (treeRuntime.activeWorkCode === nextCode) {
+    return;
+  }
+
+  if (treeRuntime.activeWorkCode) {
+    const prevNode = treeRuntime.workNodes.get(treeRuntime.activeWorkCode);
+    prevNode?.classList.remove('active');
+  }
+
+  treeRuntime.activeWorkCode = nextCode;
+
+  if (nextCode) {
+    const nextNode = treeRuntime.workNodes.get(nextCode);
+    nextNode?.classList.add('active');
+  }
+}
+
+function resetTreeRuntime(container, sectionsRef) {
+  treeRuntime.container = container;
+  treeRuntime.sectionsRef = sectionsRef;
+  treeRuntime.sectionNodes.clear();
+  treeRuntime.workNodes.clear();
+  treeRuntime.workSummaries.clear();
+}
+
+function ensureTreeDelegation(container) {
+  if (!container || treeRuntime.delegationAttached) {
+    return;
+  }
+
+  const activate = (row) => {
+    const type = row?.dataset?.type;
+    const code = row?.dataset?.code;
+    if (!type || !code) {
+      return;
+    }
+    if (type === 'section') {
+      if (!row.classList.contains('expandable')) {
+        return;
+      }
+      treeRuntime.handlers.onSectionToggle?.(code);
+      return;
+    }
+    if (type === 'work') {
+      const work = treeRuntime.workSummaries.get(code) || { code };
+      treeRuntime.handlers.onWorkSelect?.(work);
+    }
+  };
+
+  container.addEventListener('click', (event) => {
+    const row = event.target?.closest?.('.tree-item');
+    if (!row || !container.contains(row)) {
+      return;
+    }
+    activate(row);
+  });
+
+  container.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    const row = event.target?.closest?.('.tree-item');
+    if (!row || !container.contains(row)) {
+      return;
+    }
+    if (row.dataset.type !== 'work') {
+      return;
+    }
+    event.preventDefault();
+    activate(row);
+  });
+
+  treeRuntime.delegationAttached = true;
+}
+
+function getOrCreateWorkNode(work = {}, level) {
+  const code = work.code || '';
+  if (code) {
+    treeRuntime.workSummaries.set(code, work);
+  }
+
+  let row = code ? treeRuntime.workNodes.get(code) : null;
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'tree-item work-node';
+    row.dataset.type = 'work';
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+
+    const info = document.createElement('div');
+    info.className = 'item-meta';
+
+    const title = document.createElement('span');
+    title.className = 'item-name';
+    info.appendChild(title);
+
+    const codeEl = document.createElement('span');
+    codeEl.className = 'item-code';
+    info.appendChild(codeEl);
+
+    row.appendChild(info);
+
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-light text-muted';
+    row.appendChild(badge);
+
+    row.__meta = { title, codeEl, badge };
+    if (code) {
+      treeRuntime.workNodes.set(code, row);
+    }
+  }
+
+  row.dataset.code = code;
   row.dataset.level = level;
   row.dataset.sectionPath = Array.isArray(work.sectionPath)
     ? work.sectionPath.filter(Boolean).join(',')
     : '';
 
-  const info = document.createElement('div');
-  info.className = 'item-meta';
+  const meta = row.__meta;
+  meta.title.textContent = work.name || code || '—';
+  meta.codeEl.textContent = code || '';
+  meta.badge.textContent = work.measureUnit || '';
+  meta.badge.style.display = work.measureUnit ? '' : 'none';
 
-  const title = document.createElement('span');
-  title.className = 'item-name';
-  title.textContent = work.name || work.code || '—';
-  info.appendChild(title);
+  row.classList.toggle('active', Boolean(code && treeRuntime.activeWorkCode === code));
 
-  if (work.code) {
-    const code = document.createElement('span');
-    code.className = 'item-code';
-    code.textContent = work.code;
-    info.appendChild(code);
-  }
-
-  row.appendChild(info);
-
-  if (work.measureUnit) {
-    const badge = document.createElement('span');
-    badge.className = 'badge bg-light text-muted';
-    badge.textContent = work.measureUnit;
-    row.appendChild(badge);
-  }
-
-  if (selectedWorkCode && work.code === selectedWorkCode) {
-    row.classList.add('active');
-  }
-
-  row.setAttribute('role', 'button');
-  row.tabIndex = 0;
-  const pathLabel = Array.isArray(work.sectionPath)
-    ? work.sectionPath.filter(Boolean).join(' › ')
-    : '';
+  const pathLabel = Array.isArray(work.sectionPath) ? work.sectionPath.filter(Boolean).join(' › ') : '';
   const details = [];
   if (work.measureUnit) {
     details.push(work.measureUnit);
@@ -142,92 +239,70 @@ function createWorkNode(work, level, handlers, selectedWorkCode) {
   if (pathLabel) {
     details.push(pathLabel);
   }
-  const displayName = work.name || work.code || '—';
-  const titleParts = [displayName, ...details];
-  const titleText = titleParts.filter(Boolean).join(' — ');
+  const displayName = work.name || code || '—';
+  const titleText = [displayName, ...details].filter(Boolean).join(' — ');
+  row.title = titleText || '';
   if (titleText) {
-    row.title = titleText;
     row.setAttribute('aria-label', titleText);
+  } else {
+    row.removeAttribute('aria-label');
   }
-  const selectWork = () => handlers.onWorkSelect?.(work);
-  row.addEventListener('click', (event) => {
-    event.stopPropagation();
-    selectWork();
-  });
-  row.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    selectWork();
-  });
+
   return row;
 }
 
-function createSectionNode(section, level, expandedSet, handlers, selectedWorkCode) {
-  const fragment = document.createDocumentFragment();
-  const row = document.createElement('div');
-  row.className = 'tree-item section-node';
-  row.dataset.type = 'section';
-  row.dataset.code = section.code || '';
-  row.dataset.level = level;
+function getOrCreateSectionNode(section = {}, level, isExpanded) {
+  const code = section.code || '';
+  let row = code ? treeRuntime.sectionNodes.get(code) : null;
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'tree-item section-node';
+    row.dataset.type = 'section';
 
-  const info = document.createElement('div');
-  info.className = 'item-meta';
+    const info = document.createElement('div');
+    info.className = 'item-meta';
 
-  const title = document.createElement('span');
-  title.className = 'item-name';
-  title.textContent = section.name || section.code || '—';
-  info.appendChild(title);
+    const title = document.createElement('span');
+    title.className = 'item-name';
+    info.appendChild(title);
 
-  if (section.code) {
-    const code = document.createElement('span');
-    code.className = 'item-code';
-    code.textContent = section.code;
-    info.appendChild(code);
-  }
+    const codeEl = document.createElement('span');
+    codeEl.className = 'item-code';
+    info.appendChild(codeEl);
 
-  row.appendChild(info);
+    row.appendChild(info);
 
-  const hasChildren = (Array.isArray(section.children) && section.children.length) || (Array.isArray(section.works) && section.works.length);
-  if (hasChildren) {
-    row.classList.add('expandable');
     const icon = document.createElement('span');
-    icon.className = 'expand-icon bi bi-caret-right-fill';
+    icon.className = 'expand-icon';
     row.appendChild(icon);
+
+    row.__meta = { title, codeEl, icon };
+    if (code) {
+      treeRuntime.sectionNodes.set(code, row);
+    }
+  }
+
+  row.dataset.code = code;
+  row.dataset.level = level;
+  row.classList.toggle('expanded', Boolean(isExpanded));
+
+  const meta = row.__meta;
+  meta.title.textContent = section.name || code || '—';
+  meta.codeEl.textContent = code || '';
+
+  const hasChildren =
+    Boolean(section.hasChildren) ||
+    (Array.isArray(section.children) && section.children.length) ||
+    (Array.isArray(section.works) && section.works.length);
+
+  row.classList.toggle('expandable', Boolean(hasChildren));
+  if (hasChildren) {
+    meta.icon.className = 'expand-icon bi bi-caret-right-fill';
   } else {
-    const spacer = document.createElement('span');
-    spacer.className = 'expand-icon';
-    row.appendChild(spacer);
+    meta.icon.className = 'expand-icon';
   }
 
-  if (expandedSet.has(section.code)) {
-    row.classList.add('expanded');
-  }
-
-  row.addEventListener('click', (event) => {
-    event.stopPropagation();
-    handlers.onSectionToggle?.(section.code);
-  });
-
-  fragment.appendChild(row);
-
-  if (expandedSet.has(section.code)) {
-    const childLevel = level + 1;
-    if (Array.isArray(section.children)) {
-      section.children.forEach((child) => {
-        fragment.appendChild(createSectionNode(child, childLevel, expandedSet, handlers, selectedWorkCode));
-      });
-    }
-    if (Array.isArray(section.works)) {
-      section.works.forEach((work) => {
-        fragment.appendChild(createWorkNode(work, childLevel, handlers, selectedWorkCode));
-      });
-    }
-  }
-
-  return fragment;
+  return row;
 }
 
 function renderTreeContent(sections, expanded, selectedWorkCode, handlers, error) {
@@ -235,13 +310,14 @@ function renderTreeContent(sections, expanded, selectedWorkCode, handlers, error
   if (!container) {
     return;
   }
-  container.innerHTML = '';
+  treeRuntime.handlers = handlers || {};
+  ensureTreeDelegation(container);
 
   if (error) {
     const alert = document.createElement('div');
     alert.className = 'alert alert-danger mb-0';
     alert.textContent = error;
-    container.appendChild(alert);
+    container.replaceChildren(alert);
     return;
   }
 
@@ -249,16 +325,40 @@ function renderTreeContent(sections, expanded, selectedWorkCode, handlers, error
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder';
     placeholder.textContent = 'Выберите базу, чтобы увидеть содержимое.';
-    container.appendChild(placeholder);
+    container.replaceChildren(placeholder);
     return;
   }
 
+  if (treeRuntime.container !== container || treeRuntime.sectionsRef !== sections) {
+    resetTreeRuntime(container, sections);
+  }
+
+  setActiveWork(selectedWorkCode);
+
   const expandedSet = expanded instanceof Set ? expanded : new Set(expanded);
   const fragment = document.createDocumentFragment();
-  sections.forEach((section) => {
-    fragment.appendChild(createSectionNode(section, 0, expandedSet, handlers, selectedWorkCode));
-  });
-  container.appendChild(fragment);
+
+  const appendSection = (section, level) => {
+    const row = getOrCreateSectionNode(section, level, expandedSet.has(section.code));
+    fragment.appendChild(row);
+
+    if (!expandedSet.has(section.code)) {
+      return;
+    }
+
+    const childLevel = level + 1;
+    if (Array.isArray(section.children)) {
+      section.children.forEach((child) => appendSection(child, childLevel));
+    }
+    if (Array.isArray(section.works)) {
+      section.works.forEach((work) => {
+        fragment.appendChild(getOrCreateWorkNode(work, childLevel));
+      });
+    }
+  };
+
+  sections.forEach((section) => appendSection(section, 0));
+  container.replaceChildren(fragment);
 }
 
 function renderResourceCard(resource) {
@@ -590,6 +690,7 @@ export const UI = {
     showLoading(visible);
   },
   clearDetails,
+  setActiveWork,
   renderDatabaseList(databases, activeId, onSelect) {
     const list = getElement('sections-list');
     if (!list) {

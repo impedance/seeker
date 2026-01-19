@@ -240,6 +240,7 @@ function buildSection(node, depth = 0, parentPath = []) {
     code,
     name: node.getAttribute('Name') || node.getAttribute('EndName') || '',
     type: node.getAttribute('Type') || '',
+    hasChildren: node.getAttribute('HasChildren') === 'true',
     depth,
     path: sectionPath,
     children: [],
@@ -369,10 +370,18 @@ function escapeXQueryString(value) {
 }
 
 export async function getSections(database) {
+  // AICODE-NOTE: NAV/API_SECTIONS shallow root fetch to keep UI fast; children loaded via getChildren/expandNode.
   const query = `
     <sections>{
       for $section in //Section[@Type="Сборник"]
-      return $section
+      return
+        <Section
+          Code="{$section/@Code}"
+          Name="{$section/@Name}"
+          EndName="{$section/@EndName}"
+          Type="{$section/@Type}"
+          HasChildren="{exists($section/(Section|Work|NameGroup))}"
+        />
     }</sections>`;
   const response = await executeQuery(database, query);
   return parseSections(response);
@@ -383,13 +392,51 @@ export async function getChildren(database, sectionCode) {
     throw new APIError('Section code is required', { code: 'MISSING_SECTION_CODE' });
   }
   const query = `
-    <sections>{
-      let $node := //Section[@Code="${sectionCode}"]
-      return (
-        $node,
-        $node/Section
-      )
-    }</sections>`;
+    declare function local:work($w as element(Work)) as element(Work) {
+      <Work
+        Code="{$w/@Code}"
+        Name="{$w/@Name}"
+        EndName="{$w/@EndName}"
+        MeasureUnit="{$w/@MeasureUnit}"
+      />
+    };
+    declare function local:nameGroup($ng as element(NameGroup)) as element(NameGroup) {
+      <NameGroup>{
+        for $child in $ng/*
+        return
+          typeswitch($child)
+            case element(Work) return local:work($child)
+            case element(NameGroup) return local:nameGroup($child)
+            default return ()
+      }</NameGroup>
+    };
+    declare function local:sectionShallow($s as element(Section)) as element(Section) {
+      <Section
+        Code="{$s/@Code}"
+        Name="{$s/@Name}"
+        EndName="{$s/@EndName}"
+        Type="{$s/@Type}"
+        HasChildren="{exists($s/(Section|Work|NameGroup))}"
+      />
+    };
+    let $code := ${escapeXQueryString(sectionCode)}
+    let $node := (//Section[@Code=$code])[1]
+    return
+      <sections>{
+        if (empty($node)) then ()
+        else
+          <Section
+            Code="{$node/@Code}"
+            Name="{$node/@Name}"
+            EndName="{$node/@EndName}"
+            Type="{$node/@Type}"
+            HasChildren="{exists($node/(Section|Work|NameGroup))}"
+          >
+            { for $child in $node/Section return local:sectionShallow($child) }
+            { for $w in $node/Work return local:work($w) }
+            { for $ng in $node/NameGroup return local:nameGroup($ng) }
+          </Section>
+      }</sections>`;
   const response = await executeQuery(database, query);
   return parseSections(response);
 }

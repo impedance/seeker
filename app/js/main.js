@@ -83,6 +83,9 @@ let latestSearchState = {
   error: null
 };
 
+let lastTreeRevision = null;
+let lastTreeSectionsRef = null;
+
 function updateHistoryControls(snapshot) {
   const backButton = document.getElementById('nav-back');
   const forwardButton = document.getElementById('nav-forward');
@@ -98,16 +101,22 @@ function handleNavigationUpdate(snapshot) {
   UI.renderDatabaseList(CONFIG.databases, snapshot.currentDatabase, (databaseId) => {
     Navigation.loadSections(databaseId);
   });
-  UI.renderTree(
-    snapshot.sections,
-    snapshot.expanded,
-    snapshot.selectedWork?.code,
-    {
-      onSectionToggle: (code) => Navigation.expandNode(code),
-      onWorkSelect: (work) => Navigation.selectWork(work)
-    },
-    snapshot.error
-  );
+
+  const treeHandlers = {
+    onSectionToggle: (code) => Navigation.expandNode(code),
+    onWorkSelect: (work) => Navigation.selectWork(work)
+  };
+
+  const shouldRenderTree =
+    snapshot.treeRevision !== lastTreeRevision || snapshot.sections !== lastTreeSectionsRef;
+  if (shouldRenderTree) {
+    UI.renderTree(snapshot.sections, snapshot.expanded, snapshot.selectedWork?.code, treeHandlers, snapshot.error);
+    lastTreeRevision = snapshot.treeRevision;
+    lastTreeSectionsRef = snapshot.sections;
+  } else {
+    UI.setActiveWork(snapshot.selectedWork?.code);
+  }
+
   UI.renderBreadcrumbs(snapshot.breadcrumbs, (index) => {
     Navigation.focusBreadcrumb(index);
   });

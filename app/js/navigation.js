@@ -19,7 +19,8 @@ const state = {
   detailLoading: false,
   error: null,
   detailError: null,
-  detailType: null
+  detailType: null,
+  treeRevision: 0
 };
 
 const listeners = new Set();
@@ -70,31 +71,8 @@ function getHistorySnapshot() {
   };
 }
 
-function cloneWorkSummary(work = {}) {
-  return {
-    ...work,
-    sectionPath: Array.isArray(work.sectionPath) ? [...work.sectionPath] : []
-  };
-}
-
-function cloneSection(section = {}) {
-  const cloned = {
-    ...section,
-    path: Array.isArray(section.path) ? [...section.path] : [],
-    children: [],
-    works: []
-  };
-  if (Array.isArray(section.children)) {
-    cloned.children = section.children.map((child) => cloneSection(child));
-  }
-  if (Array.isArray(section.works)) {
-    cloned.works = section.works.map((work) => cloneWorkSummary(work));
-  }
-  return cloned;
-}
-
-function cloneSections(sections = []) {
-  return sections.map((section) => cloneSection(section));
+function bumpTreeRevision() {
+  state.treeRevision += 1;
 }
 
 function cloneWorkDetails(work = null) {
@@ -119,7 +97,7 @@ function getSnapshot() {
   return {
     currentDatabase: state.currentDatabase,
     sections: state.sections,
-    expanded: new Set(state.expanded),
+    expanded: state.expanded,
     selectedWork: state.selectedWork,
     selectedResource: state.selectedResource ? { ...state.selectedResource } : null,
     breadcrumbs: [...state.breadcrumbs],
@@ -129,6 +107,7 @@ function getSnapshot() {
     error: state.error,
     detailError: state.detailError,
     detailType: state.detailType,
+    treeRevision: state.treeRevision,
     history: getHistorySnapshot()
   };
 }
@@ -152,12 +131,10 @@ function mergeSectionData(sectionData) {
   function walk(nodes = []) {
     for (const node of nodes) {
       if (node.code === sectionData.code) {
-        node.children = Array.isArray(sectionData.children)
-          ? sectionData.children.map((child) => cloneSection(child))
-          : [];
-        node.works = Array.isArray(sectionData.works)
-          ? sectionData.works.map((work) => cloneWorkSummary(work))
-          : [];
+        node.children = Array.isArray(sectionData.children) ? sectionData.children : [];
+        node.works = Array.isArray(sectionData.works) ? sectionData.works : [];
+        node.hasChildren =
+          Boolean(sectionData.hasChildren) || node.children.length > 0 || node.works.length > 0;
         return true;
       }
       if (walk(node.children)) {
@@ -168,7 +145,7 @@ function mergeSectionData(sectionData) {
   }
 
   if (!walk(state.sections) && sectionData.depth === 0) {
-    state.sections.push(cloneSection(sectionData));
+    state.sections.push(sectionData);
   }
 }
 
@@ -176,6 +153,7 @@ async function loadSections(databaseId) {
   const targetDatabase = databaseId || state.currentDatabase || CONFIG.defaultDatabase;
   if (!targetDatabase) {
     state.error = 'Не выбрана база данных';
+    bumpTreeRevision();
     emit();
     return;
   }
@@ -191,20 +169,23 @@ async function loadSections(databaseId) {
   state.currentPath = [];
   state.expanded.clear();
   state.sections = [];
+  bumpTreeRevision();
   emit();
 
   try {
     const cached = sectionCache.get(targetDatabase);
     if (cached) {
-      state.sections = cloneSections(cached);
+      state.sections = cached;
     } else {
       const sections = await getSections(targetDatabase);
-      sectionCache.set(targetDatabase, cloneSections(sections));
-      state.sections = cloneSections(sections);
+      sectionCache.set(targetDatabase, sections);
+      state.sections = sections;
     }
     state.currentDatabase = targetDatabase;
+    bumpTreeRevision();
   } catch (error) {
     state.error = error?.message || 'Не удалось загрузить разделы';
+    bumpTreeRevision();
   } finally {
     state.loading = false;
     emit();
@@ -220,6 +201,7 @@ async function expandNode(sectionCode, options = {}) {
   const isExpanded = state.expanded.has(sectionCode);
   if (isExpanded && options.toggle !== false) {
     state.expanded.delete(sectionCode);
+    bumpTreeRevision();
     emit();
     return;
   }
@@ -230,6 +212,7 @@ async function expandNode(sectionCode, options = {}) {
 
   if (!state.currentDatabase) {
     state.error = 'Сначала выберите базу';
+    bumpTreeRevision();
     emit();
     return;
   }
@@ -241,23 +224,23 @@ async function expandNode(sectionCode, options = {}) {
   const cacheKey = getSectionCacheKey(state.currentDatabase, sectionCode);
   try {
     let sectionData = childrenCache.get(cacheKey);
-    if (sectionData) {
-      sectionData = cloneSection(sectionData);
-    } else {
+    if (!sectionData) {
       const nodes = await getChildren(state.currentDatabase, sectionCode);
       const [root] = nodes;
       if (!root) {
         throw new Error('Раздел не найден');
       }
-      sectionData = cloneSection(root);
-      childrenCache.set(cacheKey, cloneSection(sectionData));
+      sectionData = root;
+      childrenCache.set(cacheKey, sectionData);
     }
 
     mergeSectionData(sectionData);
     state.expanded.add(sectionCode);
+    bumpTreeRevision();
     state.error = null;
   } catch (error) {
     state.error = error?.message || 'Не удалось загрузить узел';
+    bumpTreeRevision();
   } finally {
     state.loading = false;
     emit();
