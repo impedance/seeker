@@ -54,3 +54,17 @@ Use this template before non-trivial changes to capture scope, files, anchors, r
 - **Phase 3: Navigation and caching**
   - Гарантировать, что `Navigation.selectWork` продолжает кешировать детали по Work-коду (`workCache`), и кэшированные записи содержат разделы из NameGroup.
   - Проверить, что история/хлебные крошки строятся по `sectionPath`/`sectionNames`, игнорируя NameGroup промежуточно.
+
+### План: тема по умолчанию — тёмная, переключатель работает
+- **Scope + non-goals:** Сделать страницу тёмной по умолчанию, сохранить доступный светлый режим через кнопку, обновив CSS-переменные и добавив обработку в JS; не затрагиваем другие части UI или данные навигации.
+- **Affected entry points/files:** `app/index.html` (`body`/кнопка темы), `app/css/style.css` (переменные, цвета, hover/фоновые состояния), `app/js/main.js` (логика установки темы/переключения и смены иконки), дополнительные утилиты по пути `docs/plan-template.md` (для документирования плана).
+- **Relevant AICODE anchors to read/update:** актуальные анкоры остались неизменными (`README.md`, `docs/context.md`, `docs/status.md` и `docs/decisions/*`), после всех правок по-прежнему выполнить `rg -n "AICODE-" README.md docs/*.md`.
+- **Risks/contracts to preserve:** не нарушать `AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT ... [2025-10-05]` и не ломать другие пользовательские настройки (например, `#tree-view`/`Navigation`), не добавлять ненужных `AICODE-*`.
+- **Test/check list:** открыть UI, убедиться, что фон тёмный до взаимодействия; нажать `#theme-toggle`, проверить переключение между тёмной и светлой темами, изменение иконки кнопки и корректность цветов; при возможности прогнать `rg -n "AICODE-" README.md docs/*.md`.
+
+### Plan: расследование задержки при загрузке базы
+- **Scope + non-goals:** проанализировать, почему при выборе большой базы UI долго остаётся в состоянии «Загрузка» (осмотреть запросы `Navigation.loadSections`, парсинг в `api.js`, рендер дерева и клонирование данных в `navigation.js`), не реализуем фиксы и не меняем логику отрисовки/бэкенда на этом этапе.
+- **Affected entry points/files:** `app/js/navigation.js` (загрузка секций, кеши, `mergeSectionData`), `app/js/api.js` (квери `getSections`, парсер с `DOMParser` и `collectWorkSummaries`), `app/js/ui.js` (рендер дерева и количество DOM-элементов), `app/` (структура UI для воспроизведения), `docs/status.md` (если фокус смещается после исследования либо добавляем заметку), `docs/plan-template.md` (описываем план).
+- **Relevant AICODE anchors to read/update:** `README.md` (`AICODE-NOTE: NAV/README`), `docs/context.md` (`AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT ... [2025-10-05]`), `docs/status.md` (`AICODE-NOTE: STATUS/FOCUS`/`STATUS/ENTRY`), `docs/decisions/*` (если появляются новые выводы); после любых документированных изменений выполнить `rg -n "AICODE-" README.md docs/*.md`.
+- **Risks/contracts to preserve:** не нарушать `AICODE-CONTRACT: CONTRACT/DOCS_REQUIREMENT keep README/docs/context/docs/status/docs/decisions present [2025-10-05]`; не добавлять новые `AICODE-*` типы; не менять текущий процесс загрузки/кэширования без отдельного задания.
+- **Test/check list:** открыть UI, выбрать объёмную базу (`gesn`/`gesnmr`), засечь время на `Navigation.loadSections`, посмотреть network и DevTools Performance, измерить парсинг `DOMParser`, собрать логи времени `loadSections`/`renderTree`, задокументировать шаги анализа.
