@@ -33,6 +33,8 @@ Plan must include:
 - Risks/contracts to preserve
 - Test/check list
 
+`docs/plan-template.md` is a read-only template. Do not overwrite it; create a new plan file based on it.
+
 ## README as Index (protocol)
 README must include:
 - Repository layout (paths + purpose + search pointer)
