@@ -364,6 +364,40 @@ export function parseSearchResults(xml) {
   });
 }
 
+function parseSectionIndex(xml) {
+  const doc = safeParse(xml);
+  const root = doc.documentElement;
+  if (!root) {
+    return [];
+  }
+
+  const sections = [];
+  Array.from(root.children)
+    .filter((node) => node.tagName === 'Section')
+    .forEach((section) => {
+      const code = section.getAttribute('Code') || '';
+      const name = section.getAttribute('Name') || '';
+      const ancestorsNode = Array.from(section.children).find((child) => child.tagName === 'Ancestors');
+      const ancestors = [];
+      if (ancestorsNode) {
+        Array.from(ancestorsNode.children)
+          .filter((node) => node.tagName === 'Ancestor')
+          .forEach((ancestor) => {
+            ancestors.push({
+              code: ancestor.getAttribute('Code') || '',
+              name: ancestor.getAttribute('Name') || ''
+            });
+          });
+      }
+
+      const pathNames = ancestors.map((node) => node.name).filter(Boolean);
+      const pathCodes = ancestors.map((node) => node.code).filter(Boolean);
+      sections.push({ code, name, pathNames, pathCodes });
+    });
+
+  return sections;
+}
+
 function escapeXQueryString(value) {
   const normalized = String(value).replace(/"/g, '""');
   return `"${normalized}"`;
@@ -385,6 +419,23 @@ export async function getSections(database) {
     }</sections>`;
   const response = await executeQuery(database, query);
   return parseSections(response);
+}
+
+export async function getSectionIndex(database) {
+  const query = `
+    <sections>{
+      for $section in //Section
+      let $ancestors := reverse($section/ancestor::Section)
+      return
+        <Section Code="{string($section/@Code)}" Name="{string($section/@Name)}">
+          <Ancestors>{
+            for $ancestor in $ancestors
+            return <Ancestor Code="{string($ancestor/@Code)}" Name="{string($ancestor/@Name)}" />
+          }</Ancestors>
+        </Section>
+    }</sections>`;
+  const response = await executeQuery(database, query);
+  return parseSectionIndex(response);
 }
 
 export async function getChildren(database, sectionCode) {

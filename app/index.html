@@ -32,12 +32,15 @@
             <i class="bi bi-arrow-right"></i>
           </button>
         </div>
-        <input
-          id="search-input"
-          class="form-control"
-          type="search"
-          placeholder="Search by code or name"
-        />
+        <div class="search-box">
+          <input
+            id="search-input"
+            class="form-control"
+            type="search"
+            placeholder="Search by code or name"
+          />
+          <div id="search-suggestions" class="search-suggestions" aria-live="polite"></div>
+        </div>
         <button class="btn btn-outline-secondary" id="theme-toggle" type="button" aria-label="Toggle theme">
           <i class="bi bi-sun-fill"></i>
         </button>

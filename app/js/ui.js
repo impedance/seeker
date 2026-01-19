@@ -672,6 +672,86 @@ function renderSearchResults(state = {}, handlers = {}) {
   }
 }
 
+function renderSearchSuggestions(state = {}, handlers = {}) {
+  const container = getElement('search-suggestions');
+  if (!container) {
+    return;
+  }
+  container.innerHTML = '';
+
+  const suggestions = Array.isArray(state.suggestions) ? state.suggestions : [];
+  const loading = Boolean(state.loading);
+  const error = state.error;
+  const hasContent = loading || Boolean(suggestions.length) || Boolean(error);
+
+  container.classList.toggle('active', hasContent);
+  if (!hasContent) {
+    return;
+  }
+
+  if (error) {
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-warning mb-0';
+    alert.textContent = error;
+    container.appendChild(alert);
+    return;
+  }
+
+  if (loading) {
+    const loadingNode = document.createElement('p');
+    loadingNode.className = 'placeholder mb-0';
+    loadingNode.textContent = 'Ищем подсказки...';
+    container.appendChild(loadingNode);
+    return;
+  }
+
+  if (!suggestions.length) {
+    const empty = document.createElement('p');
+    empty.className = 'placeholder mb-0';
+    empty.textContent = state.query ? 'Подсказок не найдено.' : 'Начните ввод, чтобы увидеть разделы.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'suggestion-list';
+  suggestions.forEach((suggestion) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'suggestion-chip';
+    chip.addEventListener('click', () => {
+      handlers.onSuggestion?.(suggestion);
+    });
+
+    const title = document.createElement('span');
+    title.className = 'suggestion-title';
+    title.textContent = suggestion.displayLabel || suggestion.value || 'Раздел';
+    chip.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'suggestion-meta';
+    if (suggestion.code) {
+      const code = document.createElement('span');
+      code.className = 'suggestion-code';
+      code.textContent = suggestion.code;
+      meta.appendChild(code);
+    }
+    if (suggestion.pathLabel) {
+      const path = document.createElement('span');
+      path.className = 'suggestion-path';
+      path.textContent = suggestion.pathLabel;
+      meta.appendChild(path);
+    }
+    if (meta.childElementCount > 0) {
+      chip.appendChild(meta);
+    }
+
+    list.appendChild(chip);
+  });
+
+  container.appendChild(list);
+}
+
 function showLoading(visible) {
   const loader = getElement('app-loader');
   if (!loader) {
@@ -733,6 +813,9 @@ export const UI = {
   },
   renderSearchResults(state, handlers = {}) {
     renderSearchResults(state, handlers);
+  },
+  renderSearchSuggestions(state, handlers = {}) {
+    renderSearchSuggestions(state, handlers);
   },
   renderBreadcrumbs(names, handler) {
     renderBreadcrumbTrail(names, handler);

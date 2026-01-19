@@ -76,6 +76,8 @@ const searchHandlers = {
   }
 };
 
+let searchController = null;
+
 let latestSearchState = {
   query: '',
   loading: false,
@@ -137,11 +139,29 @@ function handleNavigationUpdate(snapshot) {
   UI.renderSearchResults(latestSearchState, searchHandlers);
   UI.setLoader(snapshot.loading);
   updateHistoryControls(snapshot);
+  searchController?.refreshSuggestions();
 }
 
 function handleSearchState(state) {
   latestSearchState = state;
   UI.renderSearchResults(state, searchHandlers);
+}
+
+function handleSuggestionSelection(suggestion) {
+  if (!suggestion) {
+    return;
+  }
+  const text = suggestion.value || suggestion.name || suggestion.code || '';
+  if (!text) {
+    return;
+  }
+  searchController?.applySuggestion(text);
+}
+
+function handleSuggestionState(state) {
+  UI.renderSearchSuggestions(state, {
+    onSuggestion: handleSuggestionSelection
+  });
 }
 
 async function handleSearchSelection(databaseId, hit) {
@@ -170,7 +190,11 @@ function init() {
   initTheme();
   Navigation.subscribe(handleNavigationUpdate);
   Navigation.init();
-  registerSearch({ onStateChange: handleSearchState });
+  searchController = registerSearch({
+    onStateChange: handleSearchState,
+    onSuggestionsChange: handleSuggestionState,
+    getActiveDatabase: () => Navigation.state.currentDatabase
+  });
   const backButton = document.getElementById('nav-back');
   const forwardButton = document.getElementById('nav-forward');
   if (backButton) {
