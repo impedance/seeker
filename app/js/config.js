@@ -15,6 +15,24 @@ export const CONFIG = {
   cacheTTL: 120000,
   pageSize: 100,
   searchDebounce: 300,
+  searchSuggestions: {
+    sectionLimit: 6,
+    workLimit: 5,
+    resourceLimit: 5,
+    totalLimit: 12,
+    workFetchLimit: 40,
+    resourceFetchLimit: 40,
+    sectionMinScore: 0.28,
+    workMinScore: 0.32,
+    resourceMinScore: 0.38,
+    sectionMinToken: 1,
+    workMinToken: 2,
+    resourceMinToken: 2
+  },
+  searchSuggestionSelection: {
+    work: 'input',
+    resource: 'input'
+  },
   defaultDatabase: 'gesnmr',
   databases: [
     {

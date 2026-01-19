@@ -147,11 +147,62 @@ function handleSearchState(state) {
   UI.renderSearchResults(state, searchHandlers);
 }
 
-function handleSuggestionSelection(suggestion) {
+const suggestionSelection = CONFIG.searchSuggestionSelection || {};
+
+function getSuggestionInputValue(suggestion) {
+  return suggestion?.inputValue || suggestion?.value || suggestion?.name || suggestion?.code || '';
+}
+
+async function navigateToWorkSuggestion(suggestion) {
+  if (!suggestion?.code) {
+    return;
+  }
+  try {
+    const targetDatabase = suggestion.database || Navigation.state.currentDatabase;
+    if (targetDatabase && Navigation.state.currentDatabase !== targetDatabase) {
+      await Navigation.loadSections(targetDatabase);
+    }
+    if (Array.isArray(suggestion.sectionPath)) {
+      for (const code of suggestion.sectionPath) {
+        if (code) {
+          await Navigation.expandNode(code, { toggle: false });
+        }
+      }
+    }
+    await Navigation.selectWork({ code: suggestion.code });
+  } catch (error) {
+    console.error('Не удалось перейти к работе из подсказки', error);
+  }
+}
+
+async function navigateToResourceSuggestion(suggestion) {
+  if (!suggestion?.code) {
+    return;
+  }
+  try {
+    await Navigation.selectResource({ code: suggestion.code });
+  } catch (error) {
+    console.error('Не удалось перейти к ресурсу из подсказки', error);
+  }
+}
+
+async function handleSuggestionSelection(suggestion) {
   if (!suggestion) {
     return;
   }
-  const text = suggestion.value || suggestion.name || suggestion.code || '';
+  const type = suggestion.type || 'section';
+  const mode = suggestionSelection[type] || 'input';
+  if (mode === 'navigate') {
+    if (type === 'work') {
+      await navigateToWorkSuggestion(suggestion);
+      return;
+    }
+    if (type === 'resource') {
+      await navigateToResourceSuggestion(suggestion);
+      return;
+    }
+  }
+  const text = getSuggestionInputValue(suggestion);
   if (!text) {
     return;
   }

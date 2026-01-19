@@ -364,6 +364,50 @@ export function parseSearchResults(xml) {
   });
 }
 
+function parseWorkSuggestions(xml) {
+  const doc = safeParse(xml);
+  const root = doc.documentElement;
+  if (!root) {
+    return [];
+  }
+  const nodes = root.tagName === 'Work' ? [root] : Array.from(doc.querySelectorAll('Work'));
+  return nodes.map((work) => {
+    const sections = Array.from(work.querySelectorAll('Section')).map((section) => ({
+      code: section.getAttribute('Code') || '',
+      name: section.getAttribute('Name') || ''
+    }));
+    return {
+      code: work.getAttribute('Code') || '',
+      name: work.getAttribute('Name') || '',
+      measureUnit: work.getAttribute('MeasureUnit') || '',
+      sectionPath: sections.map((section) => section.code).filter(Boolean),
+      sectionNames: sections.map((section) => section.name).filter(Boolean)
+    };
+  });
+}
+
+function parseResourceSuggestions(xml) {
+  const doc = safeParse(xml);
+  const root = doc.documentElement;
+  if (!root) {
+    return [];
+  }
+  const nodes = root.tagName === 'Resource' ? [root] : Array.from(doc.querySelectorAll('Resource'));
+  return nodes.map((resource) => {
+    const sections = Array.from(resource.querySelectorAll('Section')).map((section) => ({
+      code: section.getAttribute('Code') || '',
+      name: section.getAttribute('Name') || ''
+    }));
+    return {
+      code: resource.getAttribute('Code') || '',
+      name: resource.getAttribute('Name') || resource.getAttribute('EndName') || '',
+      measureUnit: resource.getAttribute('MeasureUnit') || '',
+      sectionPath: sections.map((section) => section.code).filter(Boolean),
+      sectionNames: sections.map((section) => section.name).filter(Boolean)
+    };
+  });
+}
+
 function parseSectionIndex(xml) {
   const doc = safeParse(xml);
   const root = doc.documentElement;
@@ -436,6 +480,66 @@ export async function getSectionIndex(database) {
     }</sections>`;
   const response = await executeQuery(database, query);
   return parseSectionIndex(response);
+}
+
+export async function getWorkSuggestions(database, term, limit = 20) {
+  const cleanTerm = (term || '').trim();
+  if (!cleanTerm) {
+    return [];
+  }
+  const query = `
+    let $term := ${escapeXQueryString(cleanTerm)}
+    let $limit := ${limit}
+    return
+      <works>{
+        subsequence((
+          for $work in //Work
+          let $code := string($work/@Code)
+          let $title := string($work/@EndName)
+          let $name := string($work/@Name)
+          let $label := if ($title) then $title else $name
+          where
+            contains(lower-case($code), lower-case($term)) or
+            contains(lower-case($title), lower-case($term)) or
+            contains(lower-case($name), lower-case($term))
+          return
+            <Work Code="{$code}" Name="{$label}" MeasureUnit="{$work/@MeasureUnit}">
+              { for $sec in reverse($work/ancestor::Section) return <Section Code="{$sec/@Code}" Name="{$sec/@Name}" /> }
+            </Work>
+        ), 1, $limit)
+      }</works>`;
+  const response = await executeQuery(database, query);
+  return parseWorkSuggestions(response);
+}
+
+export async function getResourceSuggestions(database, term, limit = 20) {
+  const cleanTerm = (term || '').trim();
+  if (!cleanTerm) {
+    return [];
+  }
+  const query = `
+    let $term := ${escapeXQueryString(cleanTerm)}
+    let $limit := ${limit}
+    return
+      <resources>{
+        subsequence((
+          for $resource in //Resource
+          let $code := string($resource/@Code)
+          let $title := string($resource/@Name)
+          let $name := string($resource/@EndName)
+          let $label := if ($name) then $name else $title
+          where
+            contains(lower-case($code), lower-case($term)) or
+            contains(lower-case($name), lower-case($term)) or
+            contains(lower-case($title), lower-case($term))
+          return
+            <Resource Code="{$code}" Name="{$label}" MeasureUnit="{$resource/@MeasureUnit}">
+              { for $sec in reverse($resource/ancestor::Section) return <Section Code="{$sec/@Code}" Name="{$sec/@Name}" /> }
+            </Resource>
+        ), 1, $limit)
+      }</resources>`;
+  const response = await executeQuery(database, query);
+  return parseResourceSuggestions(response);
 }
 
 export async function getChildren(database, sectionCode) {

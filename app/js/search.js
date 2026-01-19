@@ -1,15 +1,41 @@
 import { CONFIG } from './config.js';
-import { search as executeSearch, getSectionIndex } from './api.js';
+import {
+  search as executeSearch,
+  getSectionIndex,
+  getWorkSuggestions,
+  getResourceSuggestions
+} from './api.js';
 
 const DEBOUNCE_MS = typeof CONFIG.searchDebounce === 'number' ? CONFIG.searchDebounce : 300;
 const SEARCHABLE_DATABASES = Array.isArray(CONFIG.databases)
   ? CONFIG.databases.filter((db) => db.searchable !== false)
   : [];
-const SUGGESTION_LIMIT = 6;
-const SUGGESTION_MIN_SCORE = 0.28;
+const SUGGESTION_CONFIG = CONFIG.searchSuggestions || {};
+const SUGGESTION_LIMITS = {
+  section: SUGGESTION_CONFIG.sectionLimit ?? 6,
+  work: SUGGESTION_CONFIG.workLimit ?? 5,
+  resource: SUGGESTION_CONFIG.resourceLimit ?? 5,
+  total: SUGGESTION_CONFIG.totalLimit ?? 12
+};
+const SUGGESTION_FETCH_LIMITS = {
+  work: SUGGESTION_CONFIG.workFetchLimit ?? 40,
+  resource: SUGGESTION_CONFIG.resourceFetchLimit ?? 40
+};
+const SUGGESTION_MIN_SCORES = {
+  section: SUGGESTION_CONFIG.sectionMinScore ?? 0.28,
+  work: SUGGESTION_CONFIG.workMinScore ?? 0.32,
+  resource: SUGGESTION_CONFIG.resourceMinScore ?? 0.38
+};
+const SUGGESTION_MIN_TOKEN = {
+  section: SUGGESTION_CONFIG.sectionMinToken ?? 1,
+  work: SUGGESTION_CONFIG.workMinToken ?? 2,
+  resource: SUGGESTION_CONFIG.resourceMinToken ?? 2
+};
+const SUGGESTION_CACHE_TTL = CONFIG.cacheTTL ?? 120_000;
 
 const sectionIndexCache = new Map();
 const sectionIndexPromises = new Map();
+const suggestionCache = new Map();
 
 function buildEmptyState() {
   return {
@@ -55,6 +81,25 @@ function replaceLastToken(original, suggestion) {
   return `${tokens.join(' ')} `;
 }
 
+function getSuggestionCache(key) {
+  const cached = suggestionCache.get(key);
+  if (!cached) {
+    return null;
+  }
+  if (cached.expiresAt < Date.now()) {
+    suggestionCache.delete(key);
+    return null;
+  }
+  return cached.value;
+}
+
+function setSuggestionCache(key, value) {
+  suggestionCache.set(key, {
+    value,
+    expiresAt: Date.now() + SUGGESTION_CACHE_TTL
+  });
+}
+
 function levenshteinDistance(a, b) {
   const lenA = a.length;
   const lenB = b.length;
@@ -98,6 +143,14 @@ function computeScoreNormalized(token, target) {
   return Math.max(0, 1 - distance / maxLength);
 }
 
+function computeEntryScore(normalizedToken, entry, pathWeight = 0.85) {
+  return Math.max(
+    computeScoreNormalized(normalizedToken, entry.normalizedName),
+    computeScoreNormalized(normalizedToken, entry.normalizedCode),
+    computeScoreNormalized(normalizedToken, entry.normalizedPath) * pathWeight
+  );
+}
+
 function formatSectionForSuggestions(entry = {}) {
   const pathNames = Array.isArray(entry.pathNames) ? entry.pathNames.filter(Boolean) : [];
   const pathCodes = Array.isArray(entry.pathCodes) ? entry.pathCodes.filter(Boolean) : [];
@@ -113,6 +166,40 @@ function formatSectionForSuggestions(entry = {}) {
     normalizedCode: normalizeText(entry.code),
     normalizedPath: normalizeText(pathLabel),
     displayLabel: entry.name || entry.code || 'Раздел'
+  };
+}
+
+function formatWorkForSuggestions(entry = {}) {
+  const pathNames = Array.isArray(entry.sectionNames) ? entry.sectionNames.filter(Boolean) : [];
+  const pathCodes = Array.isArray(entry.sectionPath) ? entry.sectionPath.filter(Boolean) : [];
+  const pathLabel = pathNames.length ? pathNames.join(' › ') : '';
+  return {
+    code: entry.code || '',
+    name: entry.name || '',
+    sectionPath: pathCodes,
+    sectionNames: pathNames,
+    pathLabel,
+    normalizedName: normalizeText(entry.name),
+    normalizedCode: normalizeText(entry.code),
+    normalizedPath: normalizeText(pathLabel),
+    displayLabel: entry.name || entry.code || 'Работа'
+  };
+}
+
+function formatResourceForSuggestions(entry = {}) {
+  const pathNames = Array.isArray(entry.sectionNames) ? entry.sectionNames.filter(Boolean) : [];
+  const pathCodes = Array.isArray(entry.sectionPath) ? entry.sectionPath.filter(Boolean) : [];
+  const pathLabel = pathNames.length ? pathNames.join(' › ') : '';
+  return {
+    code: entry.code || '',
+    name: entry.name || '',
+    sectionPath: pathCodes,
+    sectionNames: pathNames,
+    pathLabel,
+    normalizedName: normalizeText(entry.name),
+    normalizedCode: normalizeText(entry.code),
+    normalizedPath: normalizeText(pathLabel),
+    displayLabel: entry.name || entry.code || 'Ресурс'
   };
 }
 
@@ -143,7 +230,7 @@ async function ensureSectionIndex(database) {
   return promise;
 }
 
-function buildSuggestions(index = [], token, limit = SUGGESTION_LIMIT) {
+function buildSuggestions(index = [], token, limit = SUGGESTION_LIMITS.section, minScore = SUGGESTION_MIN_SCORES.section) {
   const normalizedToken = normalizeText(token);
   if (!normalizedToken || !index.length) {
     return [];
@@ -160,12 +247,8 @@ function buildSuggestions(index = [], token, limit = SUGGESTION_LIMIT) {
     if (!identifier || seen.has(identifier)) {
       return;
     }
-    const score = Math.max(
-      computeScoreNormalized(normalizedToken, section.normalizedName),
-      computeScoreNormalized(normalizedToken, section.normalizedCode),
-      computeScoreNormalized(normalizedToken, section.normalizedPath) * 0.85
-    );
-    if (score < SUGGESTION_MIN_SCORE) {
+    const score = computeEntryScore(normalizedToken, section);
+    if (score < minScore) {
       return;
     }
     seen.add(identifier);
@@ -180,14 +263,92 @@ function buildSuggestions(index = [], token, limit = SUGGESTION_LIMIT) {
   });
 
   return scored.slice(0, limit).map(({ section, score }) => ({
+    type: 'section',
     code: section.code,
     name: section.name,
     pathNames: section.pathNames,
     pathLabel: section.pathLabel,
     value: section.name || section.code || '',
+    inputValue: section.name || section.code || '',
     score,
     displayLabel: section.displayLabel
   }));
+}
+
+function buildEntitySuggestions(entries, token, limit, minScore, type) {
+  const normalizedToken = normalizeText(token);
+  if (!normalizedToken || !entries.length) {
+    return [];
+  }
+
+  const scored = [];
+  const seen = new Set();
+
+  entries.forEach((entry) => {
+    if (!entry) {
+      return;
+    }
+    const identifier = entry.code || entry.name || entry.pathLabel;
+    if (!identifier || seen.has(identifier)) {
+      return;
+    }
+    const score = computeEntryScore(normalizedToken, entry);
+    if (score < minScore) {
+      return;
+    }
+    seen.add(identifier);
+    scored.push({ entry, score });
+  });
+
+  scored.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    return String(a.entry.code || '').localeCompare(String(b.entry.code || ''));
+  });
+
+  return scored.slice(0, limit).map(({ entry, score }) => ({
+    type,
+    code: entry.code,
+    name: entry.name,
+    pathLabel: entry.pathLabel,
+    sectionPath: entry.sectionPath,
+    sectionNames: entry.sectionNames,
+    value: entry.name || entry.code || '',
+    inputValue: entry.code || entry.name || '',
+    score,
+    displayLabel: entry.displayLabel
+  }));
+}
+
+function buildSuggestionGroups({ sections = [], works = [], resources = [] }, totalLimit) {
+  const groups = [];
+  if (sections.length) {
+    groups.push({ id: 'section', label: 'Разделы', items: sections });
+  }
+  if (works.length) {
+    groups.push({ id: 'work', label: 'Работы', items: works });
+  }
+  if (resources.length) {
+    groups.push({ id: 'resource', label: 'Ресурсы', items: resources });
+  }
+  if (!Number.isFinite(totalLimit) || totalLimit <= 0) {
+    return groups;
+  }
+  let remaining = totalLimit;
+  const trimmed = groups.map((group) => {
+    if (remaining <= 0) {
+      return { ...group, items: [] };
+    }
+    const items = group.items.slice(0, remaining);
+    remaining -= items.length;
+    return { ...group, items };
+  });
+  return trimmed.filter((group) => group.items.length);
+}
+
+function flattenGroups(groups = []) {
+  return groups.reduce((acc, group) => acc.concat(group.items || []), []);
 }
 
 export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDatabase } = {}) {
@@ -204,6 +365,7 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
   let state = buildEmptyState();
   let suggestionState = {
     query: '',
+    groups: [],
     suggestions: [],
     loading: false,
     error: null
@@ -225,7 +387,7 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
   async function handleSuggestionQuery(value) {
     const rawToken = extractLastToken(value);
     if (!rawToken) {
-      emitSuggestions({ query: '', suggestions: [], loading: false, error: null });
+      emitSuggestions({ query: '', groups: [], suggestions: [], loading: false, error: null });
       return;
     }
     const database =
@@ -233,27 +395,108 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
     if (!database) {
       emitSuggestions({
         query: rawToken,
+        groups: [],
         suggestions: [],
         loading: false,
         error: 'База данных не выбрана.'
       });
       return;
     }
+    const normalizedToken = normalizeText(rawToken);
     const requestId = ++suggestionRequestId;
     emitSuggestions({ query: rawToken, loading: true, error: null });
     try {
-      const index = await ensureSectionIndex(database);
+      const errors = [];
+      const fetchSections = async () => {
+        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.section) {
+          return [];
+        }
+        const index = await ensureSectionIndex(database);
+        return buildSuggestions(index, rawToken, SUGGESTION_LIMITS.section, SUGGESTION_MIN_SCORES.section);
+      };
+      const fetchWorkSuggestions = async () => {
+        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.work) {
+          return [];
+        }
+        const cacheKey = `${database}|work|${normalizedToken}`;
+        const cached = getSuggestionCache(cacheKey);
+        if (cached) {
+          return cached;
+        }
+        const entries = await getWorkSuggestions(database, rawToken, SUGGESTION_FETCH_LIMITS.work);
+        const formatted = Array.isArray(entries) ? entries.map(formatWorkForSuggestions) : [];
+        const suggestions = buildEntitySuggestions(
+          formatted,
+          rawToken,
+          SUGGESTION_LIMITS.work,
+          SUGGESTION_MIN_SCORES.work,
+          'work'
+        ).map((suggestion) => ({ ...suggestion, database }));
+        setSuggestionCache(cacheKey, suggestions);
+        return suggestions;
+      };
+      const fetchResourceSuggestions = async () => {
+        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.resource) {
+          return [];
+        }
+        const cacheKey = `${database}|resource|${normalizedToken}`;
+        const cached = getSuggestionCache(cacheKey);
+        if (cached) {
+          return cached;
+        }
+        const entries = await getResourceSuggestions(database, rawToken, SUGGESTION_FETCH_LIMITS.resource);
+        const formatted = Array.isArray(entries) ? entries.map(formatResourceForSuggestions) : [];
+        const suggestions = buildEntitySuggestions(
+          formatted,
+          rawToken,
+          SUGGESTION_LIMITS.resource,
+          SUGGESTION_MIN_SCORES.resource,
+          'resource'
+        ).map((suggestion) => ({ ...suggestion, database }));
+        setSuggestionCache(cacheKey, suggestions);
+        return suggestions;
+      };
+
+      const [sections, works, resources] = await Promise.all([
+        fetchSections().catch((error) => {
+          errors.push(error);
+          return [];
+        }),
+        fetchWorkSuggestions().catch((error) => {
+          errors.push(error);
+          return [];
+        }),
+        fetchResourceSuggestions().catch((error) => {
+          errors.push(error);
+          return [];
+        })
+      ]);
       if (requestId !== suggestionRequestId) {
         return;
       }
-      const suggestions = buildSuggestions(index, rawToken, SUGGESTION_LIMIT);
-      emitSuggestions({ query: rawToken, loading: false, suggestions, error: null });
+      const groups = buildSuggestionGroups(
+        { sections, works, resources },
+        Number.isFinite(SUGGESTION_LIMITS.total) ? SUGGESTION_LIMITS.total : null
+      );
+      const suggestions = flattenGroups(groups);
+      const errorMessage =
+        errors.length && !suggestions.length
+          ? errors[0]?.message || 'Не удалось загрузить подсказки'
+          : null;
+      emitSuggestions({
+        query: rawToken,
+        groups,
+        loading: false,
+        suggestions,
+        error: errorMessage
+      });
     } catch (error) {
       if (requestId !== suggestionRequestId) {
         return;
       }
       emitSuggestions({
         query: rawToken,
+        groups: [],
         suggestions: [],
         loading: false,
         error: error?.message || 'Не удалось загрузить подсказки'

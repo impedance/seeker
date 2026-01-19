@@ -588,7 +588,12 @@ function renderSearchResults(state = {}, handlers = {}) {
 
   let globalHasHits = false;
   groups.forEach((group) => {
-    globalHasHits = globalHasHits || (Array.isArray(group.hits) && group.hits.length > 0);
+    const hitCount = Array.isArray(group.hits) ? group.hits.length : 0;
+    const shouldRenderGroup = group.error || hitCount > 0;
+    if (!shouldRenderGroup) {
+      return;
+    }
+    globalHasHits = globalHasHits || hitCount > 0;
     const groupEl = document.createElement('div');
     groupEl.className = 'search-group';
 
@@ -597,7 +602,7 @@ function renderSearchResults(state = {}, handlers = {}) {
     const title = document.createElement('span');
     title.textContent = group.databaseName || group.databaseId || 'База';
     const counter = document.createElement('span');
-    counter.textContent = `${group.hits?.length || 0} результатов`;
+    counter.textContent = `${hitCount} результатов`;
     header.appendChild(title);
     header.appendChild(counter);
     groupEl.appendChild(header);
@@ -679,10 +684,12 @@ function renderSearchSuggestions(state = {}, handlers = {}) {
   }
   container.innerHTML = '';
 
+  const groups = Array.isArray(state.groups) ? state.groups : [];
   const suggestions = Array.isArray(state.suggestions) ? state.suggestions : [];
   const loading = Boolean(state.loading);
   const error = state.error;
-  const hasContent = loading || Boolean(suggestions.length) || Boolean(error);
+  const hasSuggestions = groups.length ? groups.some((group) => group?.items?.length) : Boolean(suggestions.length);
+  const hasContent = loading || hasSuggestions || Boolean(error);
 
   container.classList.toggle('active', hasContent);
   if (!hasContent) {
@@ -705,50 +712,75 @@ function renderSearchSuggestions(state = {}, handlers = {}) {
     return;
   }
 
-  if (!suggestions.length) {
+  if (!hasSuggestions) {
     const empty = document.createElement('p');
     empty.className = 'placeholder mb-0';
-    empty.textContent = state.query ? 'Подсказок не найдено.' : 'Начните ввод, чтобы увидеть разделы.';
+    empty.textContent = state.query
+      ? 'Подсказок не найдено.'
+      : 'Начните ввод, чтобы увидеть разделы, работы и ресурсы.';
     container.appendChild(empty);
     return;
   }
 
-  const list = document.createElement('div');
-  list.className = 'suggestion-list';
-  suggestions.forEach((suggestion) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'suggestion-chip';
-    chip.addEventListener('click', () => {
-      handlers.onSuggestion?.(suggestion);
+  const buildSuggestionList = (items = []) => {
+    const list = document.createElement('div');
+    list.className = 'suggestion-list';
+    items.forEach((suggestion) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'suggestion-chip';
+      chip.addEventListener('click', () => {
+        handlers.onSuggestion?.(suggestion);
+      });
+
+      const title = document.createElement('span');
+      title.className = 'suggestion-title';
+      title.textContent = suggestion.displayLabel || suggestion.value || 'Раздел';
+      chip.appendChild(title);
+
+      const meta = document.createElement('div');
+      meta.className = 'suggestion-meta';
+      if (suggestion.code) {
+        const code = document.createElement('span');
+        code.className = 'suggestion-code';
+        code.textContent = suggestion.code;
+        meta.appendChild(code);
+      }
+      if (suggestion.pathLabel) {
+        const path = document.createElement('span');
+        path.className = 'suggestion-path';
+        path.textContent = suggestion.pathLabel;
+        meta.appendChild(path);
+      }
+      if (meta.childElementCount > 0) {
+        chip.appendChild(meta);
+      }
+
+      list.appendChild(chip);
     });
+    return list;
+  };
 
-    const title = document.createElement('span');
-    title.className = 'suggestion-title';
-    title.textContent = suggestion.displayLabel || suggestion.value || 'Раздел';
-    chip.appendChild(title);
+  if (groups.length) {
+    groups.forEach((group) => {
+      if (!group?.items?.length) {
+        return;
+      }
+      const groupEl = document.createElement('div');
+      groupEl.className = 'suggestion-group';
+      if (group.label) {
+        const title = document.createElement('div');
+        title.className = 'suggestion-group-title';
+        title.textContent = group.label;
+        groupEl.appendChild(title);
+      }
+      groupEl.appendChild(buildSuggestionList(group.items));
+      container.appendChild(groupEl);
+    });
+    return;
+  }
 
-    const meta = document.createElement('div');
-    meta.className = 'suggestion-meta';
-    if (suggestion.code) {
-      const code = document.createElement('span');
-      code.className = 'suggestion-code';
-      code.textContent = suggestion.code;
-      meta.appendChild(code);
-    }
-    if (suggestion.pathLabel) {
-      const path = document.createElement('span');
-      path.className = 'suggestion-path';
-      path.textContent = suggestion.pathLabel;
-      meta.appendChild(path);
-    }
-    if (meta.childElementCount > 0) {
-      chip.appendChild(meta);
-    }
-
-    list.appendChild(chip);
-  });
-
+  const list = buildSuggestionList(suggestions);
   container.appendChild(list);
 }
 

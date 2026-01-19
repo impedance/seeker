@@ -170,6 +170,20 @@ body[data-theme="light"] {
   gap: 0.4rem;
 }
 
+.suggestion-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.suggestion-group-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0.1rem 0 0;
+}
+
 .suggestion-chip {
   border: 1px solid transparent;
   background: var(--bg-panel);
