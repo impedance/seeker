@@ -1,4 +1,32 @@
-:root {
+:root,
+:root[data-theme="dark"],
+html[data-theme="dark"],
+body[data-theme="dark"] {
+  --bg-page: #030711;
+  --bg-panel: #0f172a;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #f4f7ff;
+  --text-muted: #a5b1c9;
+  --text-strong: #94b8ff;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  --accent: #95a7ff;
+  --accent-strong: #dbe2ff;
+  --danger: #f87171;
+  --success: #4ade80;
+  --resource-bg: #111833;
+  --hover-background: rgba(255, 255, 255, 0.04);
+  --search-hit-hover: rgba(255, 255, 255, 0.03);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-track: rgba(255, 255, 255, 0.04);
+  --loader-overlay: rgba(0, 0, 0, 0.8);
+  --resource-row-has-price: rgba(25, 135, 84, 0.25);
+  --resource-row-missing-price: rgba(220, 53, 69, 0.18);
+  --table-border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="light"],
+html[data-theme="light"],
+body[data-theme="light"] {
   --bg-page: #f4f6fb;
   --bg-panel: #ffffff;
   --border-color: #dde1e6;
@@ -11,6 +39,14 @@
   --danger: #dc3545;
   --success: #198754;
   --resource-bg: #f8f9ff;
+  --hover-background: #eef2ff;
+  --search-hit-hover: #f0f3ff;
+  --scrollbar-thumb: rgba(13, 110, 253, 0.35);
+  --scrollbar-track: rgba(222, 225, 230, 0.6);
+  --loader-overlay: rgba(255, 255, 255, 0.95);
+  --resource-row-has-price: rgba(25, 135, 84, 0.05);
+  --resource-row-missing-price: rgba(220, 53, 69, 0.08);
+  --table-border-color: #e6e9ef;
 }
 
 * {
@@ -23,6 +59,12 @@ body {
   background: var(--bg-page);
   color: var(--text-primary);
   min-height: 100vh;
+  transition: background 0.2s ease, color 0.2s ease;
+  color-scheme: dark;
+}
+
+body[data-theme="light"] {
+  color-scheme: light;
 }
 
 #app {
@@ -129,7 +171,7 @@ body {
 
 .panel-body.panel-scroll {
   overflow-y: auto;
-  scrollbar-color: rgba(13, 110, 253, 0.4) rgba(222, 225, 230, 0.6);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .panel-body.panel-scroll::-webkit-scrollbar {
@@ -137,7 +179,7 @@ body {
 }
 
 .panel-body.panel-scroll::-webkit-scrollbar-thumb {
-  background: rgba(13, 110, 253, 0.35);
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 
@@ -228,40 +270,6 @@ body {
   color: var(--text-strong);
 }
 
-.search-hit {
-  border: 1px solid rgba(0, 0, 0, 0);
-  border-radius: 10px;
-  padding: 0.55rem 0.75rem;
-  background: var(--bg-panel);
-  cursor: pointer;
-  text-align: left;
-}
-
-.search-hit:hover {
-  border-color: var(--border-color);
-  background: #f1f5ff;
-}
-
-.search-hit .hit-title {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.search-hit .hit-title span:last-child {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.search-hit .hit-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
 .resource-row.is-clickable {
   cursor: pointer;
 }
@@ -275,11 +283,13 @@ body {
   gap: 0.2rem;
   cursor: pointer;
   transition: border 0.2s ease, background 0.2s ease;
+  background: var(--bg-panel);
+  text-align: left;
 }
 
 .search-hit:hover {
   border-color: var(--border-color);
-  background: #f0f3ff;
+  background: var(--search-hit-hover);
 }
 
 .search-hit .hit-title {
@@ -287,6 +297,11 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.search-hit .hit-title span:last-child {
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .search-hit .hit-meta {
@@ -310,7 +325,7 @@ body {
 }
 
 .tree-item:hover {
-  background: #eef2ff;
+  background: var(--hover-background);
 }
 
 .tree-item.active {
@@ -458,7 +473,7 @@ body {
 .resource-table th,
 .resource-table td {
   padding: 0.45rem 0.65rem;
-  border-bottom: 1px solid #e6e9ef;
+  border-bottom: 1px solid var(--table-border-color);
   text-align: left;
 }
 
@@ -489,11 +504,11 @@ body {
 }
 
 .resource-row.has-price {
-  background: rgba(25, 135, 84, 0.05);
+  background: var(--resource-row-has-price);
 }
 
 .resource-row.missing-price {
-  background: rgba(220, 53, 69, 0.08);
+  background: var(--resource-row-missing-price);
 }
 
 .resource-table .price-cell {
@@ -546,7 +561,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--loader-overlay);
   z-index: 1000;
   transition: opacity 0.2s ease;
 }
