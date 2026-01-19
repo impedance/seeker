@@ -5,8 +5,6 @@ import {
   getWorkSuggestions,
   getResourceSuggestions
 } from './api.js';
-
-const DEBOUNCE_MS = typeof CONFIG.searchDebounce === 'number' ? CONFIG.searchDebounce : 300;
 const SEARCHABLE_DATABASES = Array.isArray(CONFIG.databases)
   ? CONFIG.databases.filter((db) => db.searchable !== false)
   : [];
@@ -59,13 +57,45 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
-function extractLastToken(value) {
+function parseSearchTokens(value = '') {
   const trimmed = (value || '').trim();
-  if (!trimmed) {
-    return '';
+  const rawTokens = trimmed ? trimmed.split(/\s+/) : [];
+  const normalizedValue = normalizeText(trimmed);
+  const normalizedTokens = normalizedValue ? normalizedValue.split(/\s+/).filter(Boolean) : [];
+  const normalizedLength = normalizedTokens.reduce((sum, token) => sum + token.length, 0);
+  const lastTokenRaw = rawTokens.length ? rawTokens[rawTokens.length - 1] : '';
+  return {
+    trimmed,
+    normalizedTokens,
+    normalizedLength,
+    lastTokenRaw
+  };
+}
+
+function shouldFetchSuggestions(tokens, normalizedLength, minToken) {
+  if (!tokens.length) {
+    return false;
   }
-  const tokens = trimmed.split(/\s+/);
-  return tokens[tokens.length - 1] || '';
+  if (!Number.isFinite(minToken) || minToken <= 0) {
+    return true;
+  }
+  if (normalizedLength >= minToken) {
+    return true;
+  }
+  return tokens.some((token) => token.length >= minToken);
+}
+
+function matchesAllTokens(entry, tokens) {
+  return tokens.every((token) => {
+    if (!token) {
+      return false;
+    }
+    return (
+      entry.normalizedName.includes(token) ||
+      entry.normalizedCode.includes(token) ||
+      entry.normalizedPath.includes(token)
+    );
+  });
 }
 
 function replaceLastToken(original, suggestion) {
@@ -143,12 +173,34 @@ function computeScoreNormalized(token, target) {
   return Math.max(0, 1 - distance / maxLength);
 }
 
-function computeEntryScore(normalizedToken, entry, pathWeight = 0.85) {
+function computeTokenMatchScore(normalizedToken, entry, pathWeight = 0.85) {
   return Math.max(
     computeScoreNormalized(normalizedToken, entry.normalizedName),
     computeScoreNormalized(normalizedToken, entry.normalizedCode),
     computeScoreNormalized(normalizedToken, entry.normalizedPath) * pathWeight
   );
+}
+
+function computeEntryScore(tokens = [], entry = {}) {
+  if (!tokens.length) {
+    return 0;
+  }
+  const tokenScores = tokens.map((token) => computeTokenMatchScore(token, entry));
+  const baseScore = tokenScores.reduce((sum, score) => sum + score, 0) / tokenScores.length;
+  const pathBonus = tokens.reduce((bonus, token) => {
+    const path = entry.normalizedPath || '';
+    if (!path.length) {
+      return bonus;
+    }
+    const index = path.indexOf(token);
+    if (index < 0) {
+      return bonus;
+    }
+    const closeness = 1 - index / (path.length || 1);
+    const increment = Math.min(0.05, Math.max(0, closeness) * 0.05);
+    return bonus + increment;
+  }, 0);
+  return Math.min(1, baseScore + pathBonus);
 }
 
 function formatSectionForSuggestions(entry = {}) {
@@ -230,9 +282,13 @@ async function ensureSectionIndex(database) {
   return promise;
 }
 
-function buildSuggestions(index = [], token, limit = SUGGESTION_LIMITS.section, minScore = SUGGESTION_MIN_SCORES.section) {
-  const normalizedToken = normalizeText(token);
-  if (!normalizedToken || !index.length) {
+function buildSuggestions(
+  index = [],
+  tokens = [],
+  limit = SUGGESTION_LIMITS.section,
+  minScore = SUGGESTION_MIN_SCORES.section
+) {
+  if (!tokens.length || !index.length) {
     return [];
   }
 
@@ -247,7 +303,10 @@ function buildSuggestions(index = [], token, limit = SUGGESTION_LIMITS.section, 
     if (!identifier || seen.has(identifier)) {
       return;
     }
-    const score = computeEntryScore(normalizedToken, section);
+    if (!matchesAllTokens(section, tokens)) {
+      return;
+    }
+    const score = computeEntryScore(tokens, section);
     if (score < minScore) {
       return;
     }
@@ -275,9 +334,8 @@ function buildSuggestions(index = [], token, limit = SUGGESTION_LIMITS.section, 
   }));
 }
 
-function buildEntitySuggestions(entries, token, limit, minScore, type) {
-  const normalizedToken = normalizeText(token);
-  if (!normalizedToken || !entries.length) {
+function buildEntitySuggestions(entries = [], tokens = [], limit, minScore, type) {
+  if (!tokens.length || !entries.length) {
     return [];
   }
 
@@ -292,7 +350,10 @@ function buildEntitySuggestions(entries, token, limit, minScore, type) {
     if (!identifier || seen.has(identifier)) {
       return;
     }
-    const score = computeEntryScore(normalizedToken, entry);
+    if (!matchesAllTokens(entry, tokens)) {
+      return;
+    }
+    const score = computeEntryScore(tokens, entry);
     if (score < minScore) {
       return;
     }
@@ -360,7 +421,6 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
     };
   }
 
-  let timer = null;
   let currentToken = 0;
   let state = buildEmptyState();
   let suggestionState = {
@@ -385,16 +445,21 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
   }
 
   async function handleSuggestionQuery(value) {
-    const rawToken = extractLastToken(value);
-    if (!rawToken) {
-      emitSuggestions({ query: '', groups: [], suggestions: [], loading: false, error: null });
+    const {
+      trimmed,
+      normalizedTokens,
+      normalizedLength,
+      lastTokenRaw
+    } = parseSearchTokens(value);
+    if (!normalizedTokens.length) {
+      emitSuggestions({ query: trimmed, groups: [], suggestions: [], loading: false, error: null });
       return;
     }
     const database =
       (typeof getActiveDatabase === 'function' ? getActiveDatabase() : null) || CONFIG.defaultDatabase;
     if (!database) {
       emitSuggestions({
-        query: rawToken,
+        query: trimmed,
         groups: [],
         suggestions: [],
         loading: false,
@@ -402,32 +467,40 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
       });
       return;
     }
-    const normalizedToken = normalizeText(rawToken);
+    const tokenSignature = normalizedTokens.join(' ');
     const requestId = ++suggestionRequestId;
-    emitSuggestions({ query: rawToken, loading: true, error: null });
+    emitSuggestions({ query: trimmed, loading: true, error: null });
     try {
       const errors = [];
       const fetchSections = async () => {
-        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.section) {
+        if (!shouldFetchSuggestions(normalizedTokens, normalizedLength, SUGGESTION_MIN_TOKEN.section)) {
           return [];
         }
         const index = await ensureSectionIndex(database);
-        return buildSuggestions(index, rawToken, SUGGESTION_LIMITS.section, SUGGESTION_MIN_SCORES.section);
+        return buildSuggestions(
+          index,
+          normalizedTokens,
+          SUGGESTION_LIMITS.section,
+          SUGGESTION_MIN_SCORES.section
+        );
       };
       const fetchWorkSuggestions = async () => {
-        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.work) {
+        if (!shouldFetchSuggestions(normalizedTokens, normalizedLength, SUGGESTION_MIN_TOKEN.work)) {
           return [];
         }
-        const cacheKey = `${database}|work|${normalizedToken}`;
+        if (!lastTokenRaw) {
+          return [];
+        }
+        const cacheKey = `${database}|work|${tokenSignature}`;
         const cached = getSuggestionCache(cacheKey);
         if (cached) {
           return cached;
         }
-        const entries = await getWorkSuggestions(database, rawToken, SUGGESTION_FETCH_LIMITS.work);
+        const entries = await getWorkSuggestions(database, lastTokenRaw, SUGGESTION_FETCH_LIMITS.work);
         const formatted = Array.isArray(entries) ? entries.map(formatWorkForSuggestions) : [];
         const suggestions = buildEntitySuggestions(
           formatted,
-          rawToken,
+          normalizedTokens,
           SUGGESTION_LIMITS.work,
           SUGGESTION_MIN_SCORES.work,
           'work'
@@ -436,19 +509,22 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
         return suggestions;
       };
       const fetchResourceSuggestions = async () => {
-        if (normalizedToken.length < SUGGESTION_MIN_TOKEN.resource) {
+        if (!shouldFetchSuggestions(normalizedTokens, normalizedLength, SUGGESTION_MIN_TOKEN.resource)) {
           return [];
         }
-        const cacheKey = `${database}|resource|${normalizedToken}`;
+        if (!lastTokenRaw) {
+          return [];
+        }
+        const cacheKey = `${database}|resource|${tokenSignature}`;
         const cached = getSuggestionCache(cacheKey);
         if (cached) {
           return cached;
         }
-        const entries = await getResourceSuggestions(database, rawToken, SUGGESTION_FETCH_LIMITS.resource);
+        const entries = await getResourceSuggestions(database, lastTokenRaw, SUGGESTION_FETCH_LIMITS.resource);
         const formatted = Array.isArray(entries) ? entries.map(formatResourceForSuggestions) : [];
         const suggestions = buildEntitySuggestions(
           formatted,
-          rawToken,
+          normalizedTokens,
           SUGGESTION_LIMITS.resource,
           SUGGESTION_MIN_SCORES.resource,
           'resource'
@@ -484,7 +560,7 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
           ? errors[0]?.message || 'Не удалось загрузить подсказки'
           : null;
       emitSuggestions({
-        query: rawToken,
+        query: trimmed,
         groups,
         loading: false,
         suggestions,
@@ -495,19 +571,12 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
         return;
       }
       emitSuggestions({
-        query: rawToken,
+        query: trimmed,
         groups: [],
         suggestions: [],
         loading: false,
         error: error?.message || 'Не удалось загрузить подсказки'
       });
-    }
-  }
-
-  function clearPrevious() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
     }
   }
 
@@ -541,20 +610,22 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
     emit({ loading: false, groups, error: null });
   }
 
-  function handleInput(value) {
-    handleSuggestionQuery(value);
+  function submitSearch(value) {
     const nextQuery = (value || '').trim();
-    clearPrevious();
-
     if (!nextQuery) {
       emit(buildEmptyState());
       return;
     }
-
     const token = ++currentToken;
-    timer = setTimeout(() => {
-      runSearch(nextQuery, token);
-    }, DEBOUNCE_MS);
+    runSearch(nextQuery, token);
+  }
+
+  function handleInput(value) {
+    handleSuggestionQuery(value);
+    const nextQuery = (value || '').trim();
+    if (!nextQuery) {
+      emit(buildEmptyState());
+    }
   }
 
   function applySuggestion(value = '') {
@@ -566,6 +637,7 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
     input.setSelectionRange(nextValue.length, nextValue.length);
     input.focus();
     handleInput(nextValue);
+    submitSearch(nextValue);
   }
 
   function refreshSuggestions() {
@@ -576,12 +648,27 @@ export function registerSearch({ onStateChange, onSuggestionsChange, getActiveDa
     handleInput(event.target.value);
   });
 
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.isComposing) {
+      event.preventDefault();
+      submitSearch(input.value);
+    }
+  });
+
+  const submitButton = document.getElementById('search-submit');
+  if (submitButton) {
+    submitButton.addEventListener('click', () => {
+      submitSearch(input.value);
+    });
+  }
+
   emitSuggestions(suggestionState);
   handleSuggestionQuery(input.value);
   emit(state);
 
   return {
     applySuggestion,
-    refreshSuggestions
+    refreshSuggestions,
+    submitSearch
   };
 }

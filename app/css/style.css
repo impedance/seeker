@@ -99,7 +99,7 @@ body[data-theme="light"] {
 
 #search-input {
   flex: 1;
-  min-width: 220px;
+  min-width: 0;
   font-size: 0.95rem;
 }
 
@@ -131,6 +131,12 @@ body[data-theme="light"] {
   border-radius: 12px;
 }
 
+#search-submit {
+  flex: 0 0 auto;
+  min-width: 90px;
+  align-self: stretch;
+}
+
 .search-box {
   flex: 1;
   min-width: 0;
@@ -140,7 +146,17 @@ body[data-theme="light"] {
   position: relative;
 }
 
+.search-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
 .search-suggestions {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
   display: none;
   flex-direction: column;
   gap: 0.25rem;

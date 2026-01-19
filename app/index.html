@@ -33,12 +33,23 @@
           </button>
         </div>
         <div class="search-box">
-          <input
-            id="search-input"
-            class="form-control"
-            type="search"
-            placeholder="Search by code or name"
-          />
+          <div class="search-controls">
+            <input
+              id="search-input"
+              class="form-control"
+              type="search"
+              placeholder="Search by code or name"
+              aria-label="Поиск по коду или названию"
+            />
+            <button
+              id="search-submit"
+              class="btn btn-outline-secondary"
+              type="button"
+              aria-label="Выполнить поиск"
+            >
+              Найти
+            </button>
+          </div>
           <div id="search-suggestions" class="search-suggestions" aria-live="polite"></div>
         </div>
         <button class="btn btn-outline-secondary" id="theme-toggle" type="button" aria-label="Toggle theme">

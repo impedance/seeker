@@ -1,4 +1,4 @@
-<!-- AICODE-NOTE: STATUS/FOCUS focus: UI performance 80/20 (tree load/render) ref: docs/plan-ui-performance.md -->
+<!-- AICODE-NOTE: STATUS/FOCUS focus: UI performance 80/20 (tree load/render) + multi-token search suggestions ref: docs/plan-ui-performance.md docs/plan-search-suggestions-multi-token.md -->
 <!-- AICODE-NOTE: STATUS/ENTRY next: return to filters + export (t28-t30) ref: docs/TASKS.md -->
 
 # Status
@@ -16,6 +16,7 @@
 
 ## Current focus
 - Ускорить UI по плану 80/20: уменьшить payload `getSections`, убрать лишние deep-clone и сделать рендер дерева дешевле (делегирование событий + переиспользование DOM).
+- Внедрить multi-token подсказки поиска по плану `docs/plan-search-suggestions-multi-token.md`: кешировать `suggestionCache`, учитывать все токены при ранжировании и сохранить поведение `applySuggestion`.
 
 ## Next up
 1. Вернуться к Phase 7: фильтры дерева, экспорт/избранное и аналогичные расширения из блоков t28-t30 (`docs/TASKS.md`).
